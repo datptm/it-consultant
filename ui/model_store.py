@@ -1,6 +1,7 @@
 """Save and load the latest locally trained demonstration models."""
 
 import hashlib
+import math
 import os
 import tempfile
 from dataclasses import asdict, dataclass
@@ -14,7 +15,9 @@ import skops.io
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
+from promise_poc.data import CATEGORIES
 from promise_poc.ml import TrainingConfig
 
 DEFAULT_DIR = Path(__file__).resolve().parent / ".local"
@@ -34,6 +37,7 @@ class SavedModels:
     models: dict[str, Any]
     config: TrainingConfig
     trained_at: str
+    report: dict[str, Any] | None = None
 
 
 class ModelStore:
@@ -47,9 +51,16 @@ class ModelStore:
         if not self.path.is_relative_to(self.directory):
             raise ModelStoreError("Model path must stay inside its local directory")
 
-    def save(self, models: dict[str, Any], config: TrainingConfig, sample_path: Path) -> None:
+    def save(
+        self,
+        models: dict[str, Any],
+        config: TrainingConfig,
+        sample_path: Path,
+        report: dict[str, Any] | None = None,
+    ) -> None:
         """Publish a complete bundle after all three models have trained."""
         _validate_models(models)
+        _validate_report(report)
         bundle = {
             "format_version": 1,
             "models": models,
@@ -57,6 +68,7 @@ class ModelStore:
             "trained_at": datetime.now(timezone.utc).isoformat(),
             "sample_sha256": _sample_sha256(sample_path),
             "sklearn_version": sklearn.__version__,
+            "report": report,
         }
         try:
             content = skops.io.dumps(bundle)
@@ -106,22 +118,80 @@ class ModelStore:
             _validate_models(models)
             trained_at = bundle["trained_at"]
             datetime.fromisoformat(trained_at)
+            report = bundle.get("report")
+            _validate_report(report)
         except (KeyError, TypeError, ValueError) as error:
             raise ModelStoreError("Saved model is incompatible. Retrain in ML training.") from error
-        return SavedModels(models=models, config=config, trained_at=trained_at)
+        return SavedModels(models=models, config=config, trained_at=trained_at, report=report)
 
 
 def _sample_sha256(sample_path: Path) -> str:
-    return hashlib.sha256(sample_path.read_bytes()).hexdigest()
+    path = sample_path.resolve()
+    if not path.is_relative_to(PROJECT_ROOT):
+        raise ModelStoreError("Sample path must stay inside the project")
+    digest = hashlib.sha256()
+    paths = (
+        [path / f"{category}.json" for category in ("metadata", *CATEGORIES)]
+        if path.is_dir()
+        else [path]
+    )
+    for category_path in paths:
+        resolved = category_path.resolve()
+        if not resolved.is_relative_to(path if path.is_dir() else PROJECT_ROOT):
+            raise ModelStoreError("Sample category must stay inside its directory")
+        if resolved.stat().st_size > 20 * 1024 * 1024:
+            raise ModelStoreError("Sample category is too large")
+        digest.update(resolved.name.encode("utf-8"))
+        digest.update(resolved.read_bytes())
+    return digest.hexdigest()
 
 
 def _validate_models(models: Any) -> None:
     if not isinstance(models, dict) or set(models) != MODEL_KINDS:
         raise ModelStoreError("A saved bundle must contain all three models")
     for model in models.values():
-        if not isinstance(model, Pipeline) or len(model.steps) != 2:
+        if not isinstance(model, Pipeline) or len(model.steps) != 3:
             raise ModelStoreError("Unexpected saved model pipeline")
         if not isinstance(model.steps[0][1], DictVectorizer):
             raise ModelStoreError("Unexpected feature vectorizer")
-        if not isinstance(model.steps[1][1], LogisticRegression):
+        if not isinstance(model.steps[1][1], StandardScaler):
+            raise ModelStoreError("Unexpected feature scaler")
+        if not isinstance(model.steps[2][1], LogisticRegression):
             raise ModelStoreError("Unexpected classifier")
+
+
+def _validate_report(report: Any) -> None:
+    if report is None:
+        return
+    if not isinstance(report, dict) or set(report) != MODEL_KINDS:
+        raise ModelStoreError("Invalid training report")
+    count_keys = {"total_rows", "train_rows", "validation_rows", "test_rows"}
+    time_keys = {"train_until", "validation_from", "validation_until", "test_from"}
+    for result in report.values():
+        if not isinstance(result, dict) or set(result) != count_keys | time_keys | {
+            "validation",
+            "test",
+        }:
+            raise ModelStoreError("Invalid training report")
+        if any(type(result[key]) is not int or result[key] <= 0 for key in count_keys):
+            raise ModelStoreError("Invalid training report counts")
+        if sum(result[key] for key in count_keys - {"total_rows"}) != result["total_rows"]:
+            raise ModelStoreError("Invalid training report counts")
+        try:
+            times = [datetime.fromisoformat(result[key]) for key in time_keys]
+        except (TypeError, ValueError) as error:
+            raise ModelStoreError("Invalid training report times") from error
+        if any(time.tzinfo is None for time in times):
+            raise ModelStoreError("Invalid training report times")
+        for split in ("validation", "test"):
+            scores = result[split]
+            if not isinstance(scores, dict) or set(scores) != {"accuracy", "precision", "recall"}:
+                raise ModelStoreError("Invalid training report scores")
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not 0 <= value <= 1
+                for value in scores.values()
+            ):
+                raise ModelStoreError("Invalid training report scores")

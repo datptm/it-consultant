@@ -5,10 +5,11 @@ from typing import Any
 
 import streamlit as st
 
+from promise_poc.analytics import summarize_data
 from promise_poc.data import SAMPLE_PATH, load_sample_data
 from promise_poc.engine import evaluate
-from promise_poc.features import build_training_rows
-from promise_poc.ml import TrainingConfig, train_models
+from promise_poc.features import parse_time
+from promise_poc.ml import TrainingConfig, train_models_with_report
 from ui.model_store import ModelStore, ModelStoreError, SavedModels
 
 REASONS = {
@@ -35,7 +36,9 @@ def _render_result(result: dict[str, Any]) -> None:
     source = result["selected_source_id"]
     if source is None:
         st.write("No feasible single source")
-        st.caption("Probabilities are unavailable because no eligible route was found.")
+        st.caption(
+            "Probabilities are unavailable because no source met the stock, freshness, and pickup-date checks."
+        )
     else:
         source_col, atp_col, earliest_col, promised_col = st.columns(4)
         source_col.metric("Selected source", source)
@@ -55,17 +58,32 @@ def _render_result(result: dict[str, Any]) -> None:
 
 def _render_scenarios(data: dict[str, Any], saved: SavedModels | None) -> None:
     mode = st.radio("Evaluation mode", ["Rules", "ML"], horizontal=True, key="sample_mode")
+    st.caption("Scenario descriptions explain the bundled Rules cases. ML decisions may differ.")
     if mode == "ML" and saved is None:
         st.info("Train models in the ML training tab before using ML evaluation.")
         return
     products = {product["product_id"]: product["name"] for product in data["products"]}
     for request in data["demo_requests"]:
         with st.container(border=True):
-            st.subheader(f"{request['request_id']} · {products[request['product_id']]}")
-            st.caption(
-                f"{request['quantity']} units · {request['destination_id']} · "
-                f"requested for {request['requested_delivery_date']}"
+            st.subheader(
+                f"{request['request_id']} · {request.get('scenario_name', 'Sample request')}"
             )
+            if request.get("description"):
+                st.write(request["description"])
+            st.markdown("#### Request inputs")
+            st.subheader(products[request["product_id"]])
+            st.write(f"**Product ID:** {request['product_id']}")
+            quantity_col, store_col, date_col = st.columns(3)
+            quantity_col.metric("Quantity", f"{request['quantity']:,}")
+            store_col.metric("Pickup store", request["destination_id"])
+            date_col.metric("Desired pickup date", request["requested_delivery_date"])
+            time_col, method_col = st.columns([2, 1])
+            time_col.metric(
+                "Requested at (UTC)", parse_time(request["requested_at"]).strftime("%Y-%m-%d %H:%M")
+            )
+            method_col.metric("Delivery method", "Store pickup")
+            st.divider()
+            st.markdown("#### Evaluation result")
             result = evaluate(data, request, mode.lower(), saved.models if saved else None)
             _render_result(result)
 
@@ -122,7 +140,7 @@ def _render_evaluator(data: dict[str, Any], saved: SavedModels | None) -> None:
 def _render_training(data: dict[str, Any], store: ModelStore, saved: SavedModels | None) -> None:
     st.write("Train three logistic regression models from the bundled synthetic history.")
     st.caption(
-        "These tiny training sets have no independent validation or calibrated probabilities."
+        "Validation and test scores use later synthetic history. Probabilities are not calibrated."
     )
     if st.session_state.pop("training_complete", False):
         st.progress(100, text="Trained all three models")
@@ -134,19 +152,45 @@ def _render_training(data: dict[str, Any], store: ModelStore, saved: SavedModels
             f"Latest saved model: C = {saved.config.c:g}, "
             f"max_iter = {saved.config.max_iter}, trained {saved.trained_at}"
         )
+    summary = summarize_data(data)
     rows = []
     for kind in ("inventory", "fulfillment", "delivery"):
-        training_rows = build_training_rows(data, kind)
-        positives = sum(label for _, label in training_rows)
+        result = summary[kind]
         rows.append(
             {
                 "Model": kind.title(),
-                "Rows": len(training_rows),
-                "Positive": positives,
-                "Negative": len(training_rows) - positives,
+                "Rows": result["rows"],
+                "Positive": result["positive"],
+                "Negative": result["rows"] - result["positive"],
             }
         )
     st.table(rows)
+    if saved is not None and saved.report is not None:
+        st.subheader("Validation and test metrics")
+        st.caption(
+            "Chronological split per model: 70% train / 15% validation / 15% test. "
+            "Accuracy, Precision, and Recall use the positive outcome as class 1. "
+            "Scores describe held-out synthetic records only."
+        )
+        metric_rows = []
+        for kind in ("inventory", "fulfillment", "delivery"):
+            report = saved.report[kind]
+            for split, count_key in (
+                ("validation", "validation_rows"),
+                ("test", "test_rows"),
+            ):
+                metric_rows.append(
+                    {
+                        "Model": kind.title(),
+                        "Split": split.title(),
+                        "Train rows": report["train_rows"],
+                        "Held-out rows": report[count_key],
+                        "Accuracy": f"{report[split]['accuracy']:.1%}",
+                        "Precision": f"{report[split]['precision']:.1%}",
+                        "Recall": f"{report[split]['recall']:.1%}",
+                    }
+                )
+        st.table(metric_rows)
     with st.form("train_form"):
         c = st.number_input(
             "C (inverse regularization strength)",
@@ -174,13 +218,47 @@ def _render_training(data: dict[str, Any], store: ModelStore, saved: SavedModels
         def on_progress(kind: str, completed: int, total: int) -> None:
             progress_bar.progress(int(completed / total * 100), text=f"Trained {kind} model")
 
-        models = train_models(data, config=config, progress=on_progress)
-        store.save(models, config, SAMPLE_PATH)
+        models, report = train_models_with_report(data, config=config, progress=on_progress)
+        store.save(models, config, SAMPLE_PATH, report)
     except (ValueError, ModelStoreError, OSError) as error:
         st.error(f"Training was not saved: {error}")
         return
     st.session_state["training_complete"] = True
     st.rerun()
+
+
+def _render_analytics(data: dict[str, Any]) -> None:
+    summary = summarize_data(data)
+    st.write("Historical synthetic outcomes used to build the three ML datasets.")
+    st.caption("Generated records are illustrative; these rates are not real-world performance.")
+    models = (
+        ("Inventory accuracy", "inventory"),
+        ("Full pick", "fulfillment"),
+        ("On-time delivery after full pick", "delivery"),
+    )
+    chart_rows = []
+    for column, (label, kind) in zip(st.columns(3), models):
+        result = summary[kind]
+        rate = result["positive"] / result["rows"] if result["rows"] else 0
+        column.metric(
+            label, f"{rate:.1%}", help=f"{result['positive']:,} of {result['rows']:,} rows"
+        )
+        chart_rows.append(
+            {
+                "Dataset": label,
+                "Positive": result["positive"],
+                "Negative": result["rows"] - result["positive"],
+            }
+        )
+    st.subheader("Training label balance")
+    st.bar_chart(chart_rows, x="Dataset", y=["Positive", "Negative"], stack=True)
+    st.subheader("Outcomes by product")
+    st.dataframe(summary["by_product"], hide_index=True, width="stretch")
+    st.subheader("Outcomes by source location")
+    st.dataframe(summary["by_location"], hide_index=True, width="stretch")
+    st.caption(
+        "On-time counts include only orders picked in full; inventory accuracy allows a one-unit deviation."
+    )
 
 
 def main() -> None:
@@ -197,8 +275,8 @@ def main() -> None:
     except ModelStoreError as error:
         st.warning(str(error))
         saved = None
-    sample_tab, evaluate_tab, training_tab = st.tabs(
-        ["Sample scenarios", "Evaluate a request", "ML training"]
+    sample_tab, evaluate_tab, training_tab, analytics_tab = st.tabs(
+        ["Sample scenarios", "Evaluate a request", "ML training", "Data analytics"]
     )
     with sample_tab:
         _render_scenarios(data, saved)
@@ -206,6 +284,8 @@ def main() -> None:
         _render_evaluator(data, saved)
     with training_tab:
         _render_training(data, store, saved)
+    with analytics_tab:
+        _render_analytics(data)
 
 
 main()

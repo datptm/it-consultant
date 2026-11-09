@@ -6,7 +6,7 @@ Trust boundary: Streamlit form values and local sample/model files are inputs to
 
 ## Tech stack
 - Language/runtime: Python 3.13+   Framework: Streamlit; scikit-learn models
-- Data/storage: synthetic `data/sample.json` and a local `skops` model bundle in ignored `ui/.local/`; no database, cache service, or queue
+- Data/storage: synthetic category files in `data/` and a local `skops` model bundle in ignored `ui/.local/`; no database, cache service, or queue
 - Platform: local desktop/browser use; documented commands target PowerShell on Windows
 
 ## Commands

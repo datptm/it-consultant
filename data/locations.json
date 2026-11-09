@@ -1,0 +1,67 @@
+[
+  {
+    "location_id": "STORE-001",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-002",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-003",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-004",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-005",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-006",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-007",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-008",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-009",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "STORE-010",
+    "location_type": "STORE",
+    "country": "SE"
+  },
+  {
+    "location_id": "DC-001",
+    "location_type": "DC",
+    "country": "SE"
+  },
+  {
+    "location_id": "DC-002",
+    "location_type": "DC",
+    "country": "SE"
+  },
+  {
+    "location_id": "DC-003",
+    "location_type": "DC",
+    "country": "SE"
+  }
+]

@@ -1,6 +1,6 @@
 # Promise Engine PoC data, features, and trained models
 
-This document describes the **working core** of the PoC: its inputs, how they become features and labels, the three trained models, and how their outputs are used to evaluate a request. The authoritative sources for this PoC are [`data/sample.json`](../data/sample.json), [`features.py`](../src/promise_poc/features.py), [`ml.py`](../src/promise_poc/ml.py), [`rules.py`](../src/promise_poc/rules.py), and [`engine.py`](../src/promise_poc/engine.py). Broader ideas are described in [`docs/resources/methodology.md`](resources/methodology.md); fields and techniques mentioned only there **are not necessarily implemented** here.
+This document describes the **working core** of the PoC: its inputs, how they become features and labels, the three trained models, and how their outputs are used to evaluate a request. The authoritative sources for this PoC are the category files in [`data/`](../data/), [`features.py`](../src/promise_poc/features.py), [`ml.py`](../src/promise_poc/ml.py), [`rules.py`](../src/promise_poc/rules.py), and [`engine.py`](../src/promise_poc/engine.py). Broader ideas are described in [`docs/resources/methodology.md`](resources/methodology.md); fields and techniques mentioned only there **are not necessarily implemented** here.
 
 ## 1. Three questions the models address
 
@@ -21,7 +21,7 @@ Two modes use the same data and hard constraints:
 
 ## 2. Sample data and the purpose of each group
 
-All records are **synthetic data**. The time uses ISO 8601 UTC string with suffix `Z`; quantity is integer units of SKU. `reference_time = 2026-11-05T10:30:00Z` ensures CLI commands run the same scenario again. The sample has 2 products, 3 locations, 4 routes, 11 snapshots (8 historical and 3 current), 8 events, 8 inventory checks, 8 historical orders, and 3 demo requests.
+All records are **synthetic data**. The time uses ISO 8601 UTC string with suffix `Z`; quantity is integer units of SKU. `reference_time = 2026-11-05T10:30:00Z` ensures CLI commands run the same scenario again. `data/metadata.json` stores this time; each other category has its own JSON array. The default seed produces 30 products, 10 pickup stores and three DCs, 40 routes, 10,000 historical snapshots and 390 current snapshots, 10,000 inventory counts, 10,000 historical orders, and 7 demo requests. The generator is [`scripts/generate_data.py`](../scripts/generate_data.py).
 
 ### 2.1. Catalog and routes
 
@@ -33,6 +33,8 @@ All records are **synthetic data**. The time uses ISO 8601 UTC string with suffi
 | `lanes` | `cutoff_hour_utc`, `processing_days`, `transit_days` | Calculate the earliest delivery date from the cutoff and number of business days. `cutoff_hour_utc` is an integer UTC hour. |
 
 Two locations can share the same SKU, but only if there is a suitable route and a snapshot of the SKU at that source. Each option only picks from **one** source; the `lane_id` of the historical order connects the order to the route used when creating the delivery feature.
+
+`DC` means **distribution center**: `DC-001`, `DC-002`, and `DC-003` hold stock and ship it to pickup stores. They are supply sources, not pickup destinations in the UI. `STORE` means a customer pickup location; a store can also supply its own pickup request from stock on hand. Each DC has a route to every store (one processing plus one transit business day), and each store has a same-store pickup route (zero processing and transit days). The original DC uses lane IDs `DC-Sn`; the other DCs use `DC2-Sn` and `DC3-Sn`. Both source types require a usable inventory snapshot and pass the same stock and date feasibility checks. Source type is a categorical ML feature; the current rules do not give DC and STORE separate confidence formulas.
 
 ### 2.2. Inventory status and quality signals
 
@@ -63,7 +65,7 @@ Do not add `events` again to `on_hand`: snapshot is the system inventory count a
 | `orders` | `delivered_at` | Delivery results, **only use as labels** for on-time. |
 | `demo_requests` | `request_id`, `product_id`, `quantity`, `destination_id`, `delivery_type`, `requested_at`, `requested_delivery_date` | Requests for inference. The `evaluate` command accepts the key values; without `--at`, it uses `reference_time`. |
 
-All historical orders in the sample are tied to `SKU-001` at `DC-001`; demo requirements include `SKU-002` at the store. Therefore, the ML model **has no evidence of learning to generalize** to other SKUs/locations. `products.category` and SKU identification are not features of the three current models.
+Generated historical orders cover all 30 SKUs and all 13 source locations. `products.category` and SKU identification are not features of the three current models, so differences across products are visible in the analytics tab but not learned directly.
 
 ## 3. Time rule: what data is allowed to become a feature?
 
@@ -128,13 +130,13 @@ The earliest delivery date is calculated **before** prediction: if an order is p
 
 | Model | A row starts from | Label `1` | Label `0` | Sample count |
 |---|---|---|---|---|
-| Inventory | A `count` connected to snapshot via `snapshot_id` | `abs(snapshot.on_hand - count.actual_on_hand) <= 1` | Large deviation greater than 1 | 8: **4/4** |
-| Fulfillment | An `order` linked to a snapshot by `snapshot_id` | `picked_quantity >= quantity` | Picked too few items | 8: **6/2** |
-| Delivery | An `order` picked in full and linked to a snapshot and lane | `date(delivered_at) <= requested_delivery_date` | Delivered after the desired date | 6: **3/3** |
+| Inventory | A `count` connected to snapshot via `snapshot_id` | `abs(snapshot.on_hand - count.actual_on_hand) <= 1` | Large deviation greater than 1 | 10,000: **7,246/2,754** |
+| Fulfillment | An `order` linked to a snapshot by `snapshot_id` | `picked_quantity >= quantity` | Picked too few items | 10,000: **7,071/2,929** |
+| Delivery | An `order` picked in full and linked to a snapshot and lane | `date(delivered_at) <= requested_delivery_date` | Delivered after the desired date | 7,071: **5,425/1,646** |
 
-The ratios `4/4`, `6/2`, and `3/3` are counts of labels `1`/`0`, **not** real business success rates. The two orders with insufficient picks are excluded from the Delivery set, but retain fulfillment label `0`. The PoC compares the **delivery date**, not the time within that day. Inventory tolerance is fixed at **1 unit**, with no configuration by item type or stock level. The code cannot distinguish customer cancellations, carrier failures, changes to promised dates, or unverified counts because the sample lacks those statuses.
+The analytics tab shows current counts of labels `1`/`0`; these are **not** real business success rates. Orders with insufficient picks are excluded from the Delivery set, but retain fulfillment label `0`. The PoC compares the **delivery date**, not the time within that day. Inventory tolerance is fixed at **1 unit**, with no configuration by item type or stock level. The code cannot distinguish customer cancellations, carrier failures, changes to promised dates, or unverified counts because the sample lacks those statuses.
 
-To see the difference between feature and label: with `H1`, the snapshot records `on_hand = 20` at 10:00, the stock count at 12:00 shows `actual_on_hand = 20`, so the inventory label is `1`. The feature of `H1` is built at **10:00**; the actual count value at 12:00 is not present in the feature dictionary. With `H2`, the snapshot records `20` and then the count shows `13`, with a discrepancy of `7 > 1`, so the label is `0`.
+To see the difference between feature and label: an inventory feature is built at the snapshot's `observed_at` time, while the connected count's `actual_on_hand` is observed later and supplies the label. A difference of at most one unit is positive; a larger difference is negative. The actual count value and count timestamp are never included in that snapshot's feature dictionary.
 
 ## 6. Current ML Training
 
@@ -142,14 +144,14 @@ To see the difference between feature and label: with `H1`, the snapshot records
 
 1. Call `build_training_rows(data, kind)` to receive the list `(feature_dict, label 0/1)` as defined above.
 2. Refuse to train if the model's dataset does not contain **both label classes**.
-3. By default, create a `DictVectorizer()` → `LogisticRegression(C=1, max_iter=1000)` pipeline for the CLI; the web interface can change `C` and `max_iter`. `DictVectorizer` retains numeric features and turns categorical strings into indicator columns; logistic regression learns weights to estimate the probability of class `1`.
+3. By default, create a `DictVectorizer()` → `StandardScaler(with_mean=False)` → `LogisticRegression(C=1, max_iter=1000)` pipeline for the CLI; the web interface can change `C` and `max_iter`. `DictVectorizer` retains numeric features and turns categorical strings into indicator columns; scaling keeps the numeric ranges tractable for the larger dataset; logistic regression learns weights to estimate the probability of class `1`.
 4. `fit` on **all** rows for that model. At inference time, call `predict_proba` and take the column for class `1`.
 
-Each time CLI `--mode ml` is used, all three pipelines are retrained **in memory** from `data/sample.json`; CLI does not use model files, registry, or incremental learning steps. Default `C=1`, `max_iter=1000`; other parameters use defaults from the installed scikit-learn version. PoC does not include numerical scaling, handling missing values, class balancing, hyperparameter selection, time-based data splitting, independent validation/test sets, or probability calibration. Therefore, numbers like `0.82` or `0.99` from `predict_proba` **cannot be interpreted** as proven success rates.
+Each time CLI `--mode ml` is used, all three pipelines are retrained **in memory** from the category files in `data/`; CLI does not use model files, registry, or incremental learning steps. Default `C=1`, `max_iter=1000`; other parameters use defaults from the installed scikit-learn version. CLI training still fits all available rows. PoC does not include handling missing values, class balancing, hyperparameter selection, external validation data, or probability calibration. Therefore, numbers like `0.82` or `0.99` from `predict_proba` **cannot be interpreted** as proven success rates.
 
-Streamlit interface at `ui/app.py` separates training from ML evaluation: the **ML training** tab adjusts `C` (0.01–100) and `max_iter` (100–5000) shared across all three pipelines, trains on this exact dataset, and saves a bundle `skops` at `ui/.local/latest.skops`. The evaluation tab only loads the saved bundle and does not retrain; if the bundle is missing or incompatible with the scikit-learn version or the sample data content, the user must retrain. CLI defaults to `C=1`, `max_iter=1000`, and retraining each call. The bundle is only for local demo purposes and not a model registry or model quality evidence.
+Streamlit interface at `ui/app.py` separates training from ML evaluation: the **ML training** tab adjusts `C` (0.01–100) and `max_iter` (100–5000) shared across all three pipelines. For each model it sorts examples by prediction time, fits the earliest 70%, then scores the next 15% as validation and final 15% as test. It displays each split's row count and accuracy, precision, and recall (positive class `1`; zero precision or recall when the denominator is zero). The fitted models and report are saved together in a `skops` bundle at `ui/.local/latest.skops`. The evaluation tab only loads the saved bundle and does not retrain; if the bundle is missing or incompatible with the scikit-learn version or the sample data content, the user must retrain. Older saved bundles can still be loaded but have no report until retrained. The bundle is only for local demo purposes and not a model registry or model quality evidence.
 
-In the sample training data, all units and counts belong to the first DC/SKU; when applying the model to a different store or SKU, the encoding may encounter unseen classification values and Logistic Regression must extrapolate. Do not use this result to evaluate model effectiveness or make commercial commitments.
+The generated history includes all 30 SKUs and all 13 source locations, but SKU and source ID are not model features. The held-out scores measure these synthetic patterns only. Do not use them to make commercial commitments.
 
 ## 7. From feature to decision: where do rules and ML differ?
 
@@ -201,7 +203,7 @@ The inventory ranges used in `reasons` are `HIGH` from `0,85`, `MEDIUM` from `0,
 1. Snapshot `LIVE-DC` at 10:00 has `on_hand = 100`, `reserved = 10`, `allocated = 0`, `pending_transactions = 0`, `source_updated_at = 09:00`. At 10:30: `stock_age_hours = 1,5`, `days_since_last_count ≈ 1,0208`, `sales_velocity_7d = 0`, `historical_discrepancy = 0` within the current window. With no penalty conditions applied, the confidence rules are `1,00`.
 2. `safety_buffer = ceil(100 × (1 − 1,00) × 0,5) = 0`; `ATP = 100 − 10 − 0 − 0 = 90`, sufficient for 2 units. `inbound = 20` in the snapshot does not increase ATP.
 3. Placed before the cutoff on Thursday 05/11; two business days later is Monday **09/11**. The desired date 10/11 is later than the earliest date, so rules mode assigns `on_time = 0,99`. ATP exceeds the request by at least two units, so rules mode assigns `fulfillment = 0,99`.
-4. `promise_success = 0,99 × 0,99 = 0,9801`. Confidence `1,00 >= 0,85` and success `0,9801 >= 0,95`, so the result rules are `PROMISE`, source `DC-001`, promised date `2026-11-10`.
+4. `promise_success = 0,99 × 0,99 = 0,9801`. Confidence `1,00 >= 0,85` and success `0,9801 >= 0,95`, so this candidate qualifies for `PROMISE`. The other two DCs also qualify with equal probability, confidence, and earliest date; the final tie-break selects `DC-003`. The promised date is `2026-11-10`.
 
 ML mode uses **the same snapshot, lane, request, and ATP/date gates**, but replaces the three rules-based values with model predictions. Limited data can make the ML decision differ from rules, including a `REJECT` for this example; that reflects the sample's limitations, not evidence that ML is safer.
 
@@ -215,4 +217,4 @@ python -m promise_poc demo --mode ml
 python -m promise_poc evaluate --product-id SKU-001 --quantity 2 --destination-id STORE-001 --date 2026-11-10 --mode ml
 ```
 
-The `demo` commands return three requests that illustrate sufficient stock, a shortage, and another SKU. The CLI does not record feedback or retrain after a decision; a later ML run still learns from the same eight sample orders and counts. A serious probability evaluation requires enough reliable historical data, time-based train/validation/test splits, error analysis by SKU/source/lane, and calibration measures such as Brier score on held-out data. These steps **are not part of the current PoC**.
+The `demo` commands return seven requests covering DC fulfillment, store pickup, stock shortage, an infeasible date, manual verification for a narrow stock margin, rejection for low inventory confidence, and stale inventory. Optional `scenario_name` and `description` fields explain each case in the UI; they are not model features. Each request has its own evaluation time, including a historical low-confidence case and a later stale-data case. The expected Rules outcomes in README apply to the bundled default-seed history; different generator settings or ML predictions may change them. The CLI does not record feedback or retrain after a decision; a later ML run still learns from the same generated history unless the files are regenerated. A serious probability evaluation still requires reliable real-world historical data, error analysis by SKU/source/lane, and calibration measures such as Brier score on held-out data. These steps **are not part of the current PoC**.

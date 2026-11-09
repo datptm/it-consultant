@@ -11,7 +11,7 @@ def main() -> None:
     """Parse CLI input, evaluate it and print JSON to standard output."""
     parser = argparse.ArgumentParser(description="Synthetic Promise Engine PoC")
     subcommands = parser.add_subparsers(dest="command", required=True)
-    demo = subcommands.add_parser("demo", help="Evaluate all three bundled requests")
+    demo = subcommands.add_parser("demo", help="Evaluate all bundled scenario requests")
     direct = subcommands.add_parser("evaluate", help="Evaluate a custom request")
     for command in (demo, direct):
         command.add_argument("--mode", choices=("rules", "ml"), default="rules")

@@ -1,0 +1,79 @@
+[
+  {
+    "request_id": "REQ-001",
+    "scenario_name": "DC fulfillment",
+    "description": "A small order with enough stock and time for a distribution center to supply the pickup store.",
+    "product_id": "SKU-001",
+    "quantity": 2,
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-11-05T10:30:00Z",
+    "requested_delivery_date": "2026-11-10"
+  },
+  {
+    "request_id": "REQ-002",
+    "scenario_name": "Insufficient stock",
+    "description": "The requested quantity exceeds the stock available from any single source.",
+    "product_id": "SKU-001",
+    "quantity": 10000,
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-11-05T10:30:00Z",
+    "requested_delivery_date": "2026-11-10"
+  },
+  {
+    "request_id": "REQ-003",
+    "scenario_name": "Pickup from store stock",
+    "description": "The pickup store can fulfill this small order directly from its own inventory.",
+    "product_id": "SKU-002",
+    "quantity": 1,
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-11-05T10:30:00Z",
+    "requested_delivery_date": "2026-11-06"
+  },
+  {
+    "request_id": "REQ-004",
+    "scenario_name": "Pickup date too early",
+    "description": "The store inventory is stale, and the distribution centers cannot deliver by the requested date.",
+    "product_id": "SKU-001",
+    "quantity": 2,
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-11-05T10:30:00Z",
+    "requested_delivery_date": "2026-11-05"
+  },
+  {
+    "request_id": "REQ-005",
+    "scenario_name": "Limited stock needs verification",
+    "description": "All five available store units are needed. The date is feasible, but the narrow stock margin triggers manual verification in Rules mode.",
+    "product_id": "SKU-002",
+    "quantity": 5,
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-11-05T10:30:00Z",
+    "requested_delivery_date": "2026-11-06"
+  },
+  {
+    "request_id": "REQ-006",
+    "scenario_name": "Low inventory confidence",
+    "description": "This historical request has sufficient stock and time, but unreliable inventory prevents a promise in Rules mode.",
+    "product_id": "SKU-012",
+    "quantity": 1,
+    "destination_id": "STORE-002",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-10-12T06:35:00Z",
+    "requested_delivery_date": "2026-10-22"
+  },
+  {
+    "request_id": "REQ-007",
+    "scenario_name": "Stale inventory",
+    "description": "The request is made two days after the sample reference time. All stock information for this product is older than the 24-hour freshness limit.",
+    "product_id": "SKU-001",
+    "quantity": 2,
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "requested_at": "2026-11-07T10:30:00Z",
+    "requested_delivery_date": "2026-11-12"
+  }
+]

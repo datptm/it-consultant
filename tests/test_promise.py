@@ -52,17 +52,21 @@ class DataAndEngineTests(unittest.TestCase):
 
     def test_training_labels_use_later_outcome_without_future_features(self):
         rows = build_training_rows(self.data, "inventory")
-        self.assertEqual(len(rows), 8)
+        self.assertEqual(len(rows), 10000)
         self.assertEqual({label for _, label in rows}, {0, 1})
         first_features, first_label = rows[0]
-        self.assertEqual(first_label, 1)
+        first_count = self.data["counts"][0]
+        first_snapshot = next(
+            item for item in self.data["snapshots"] if item["snapshot_id"] == first_count["snapshot_id"]
+        )
+        self.assertEqual(first_label, int(abs(first_count["actual_on_hand"] - first_snapshot["on_hand"]) <= 1))
         self.assertNotIn("actual_on_hand", first_features)
         self.assertNotIn("counted_at", first_features)
         self.assertGreaterEqual(first_features["stock_age_hours"], 0)
 
     def test_unreceived_sale_cannot_change_historical_features(self):
         data = json.loads(json.dumps(self.data))
-        snapshot = next(item for item in data["snapshots"] if item["snapshot_id"] == "H1")
+        snapshot = next(item for item in data["snapshots"] if item["snapshot_id"] == "GEN-00000")
         at_time = parse_time(snapshot["observed_at"])
         baseline = inventory_features(data, snapshot, at_time)["sales_velocity_7d"]
         data["events"].append({
@@ -73,15 +77,18 @@ class DataAndEngineTests(unittest.TestCase):
         self.assertEqual(inventory_features(data, snapshot, at_time)["sales_velocity_7d"], baseline)
 
     def test_order_training_has_both_outcomes(self):
-        for kind, length in (("fulfillment", 8), ("delivery", 6)):
+        for kind, length in (("fulfillment", 10000), ("delivery", None)):
             with self.subTest(kind=kind):
                 rows = build_training_rows(self.data, kind)
-                self.assertEqual(len(rows), length)
+                if length is None:
+                    self.assertGreater(len(rows), 6500)
+                else:
+                    self.assertEqual(len(rows), length)
                 self.assertEqual({label for _, label in rows}, {0, 1})
 
     def test_rule_mode_selects_eligible_single_source(self):
         result = evaluate(self.data, self.data["demo_requests"][0], "rules")
-        self.assertEqual(result["selected_source_id"], "DC-001")
+        self.assertEqual(result["selected_source_id"], "DC-003")
         self.assertEqual(result["decision"], "PROMISE")
         self.assertGreaterEqual(result["probabilities"]["promise_success"], 0.95)
 
@@ -93,8 +100,9 @@ class DataAndEngineTests(unittest.TestCase):
 
     def test_inbound_stock_is_not_available_to_promise(self):
         data = json.loads(json.dumps(self.data))
-        snapshot = next(item for item in data["snapshots"] if item["snapshot_id"] == "LIVE-DC")
-        snapshot.update(on_hand=0, reserved=0, allocated=0, inbound=100)
+        for snapshot in data["snapshots"]:
+            if snapshot["snapshot_id"].startswith("LIVE-") and snapshot["product_id"] == "SKU-001":
+                snapshot.update(on_hand=0, reserved=0, allocated=0, inbound=100)
         request = {**data["demo_requests"][0], "quantity": 11}
         self.assertEqual(evaluate(data, request, "rules")["decision"], "REJECT")
 
@@ -142,7 +150,7 @@ class DataAndEngineTests(unittest.TestCase):
                 )
                 output = json.loads(completed.stdout)
                 if arguments[0] == "demo":
-                    self.assertEqual(len(output), 3)
+                    self.assertEqual(len(output), 7)
                     self.assertTrue(all("decision" in item for item in output))
                 else:
                     self.assertIn("decision", output)

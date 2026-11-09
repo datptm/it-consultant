@@ -47,16 +47,38 @@ class StreamlitUiTests(unittest.TestCase):
     def open_app(self):
         return AppTest.from_file(str(ROOT / "ui" / "app.py")).run(timeout=30)
 
-    def test_page_shows_three_tabs_and_rule_scenarios(self):
+    def test_page_shows_four_tabs_rule_scenarios_and_analytics(self):
         app = self.open_app()
 
         self.assertFalse(app.exception)
         self.assertEqual(
             [tab.label for tab in app.tabs],
-            ["Sample scenarios", "Evaluate a request", "ML training"],
+            ["Sample scenarios", "Evaluate a request", "ML training", "Data analytics"],
         )
         self.assertIn("REQ-001", page_text(app))
         self.assertIn("PROMISE", page_text(app))
+        self.assertIn("Training label balance", page_text(app))
+        self.assertIn("Outcomes by product", page_text(app))
+        self.assertIn("Outcomes by source location", page_text(app))
+        self.assertIn("Inventory accuracy", [metric.label for metric in app.metric])
+        self.assertIn("72.5%", [metric.value for metric in app.metric])
+
+    def test_scenarios_show_large_labeled_request_inputs(self):
+        app = self.open_app()
+
+        self.assertFalse(app.exception)
+        for label in (
+            "Quantity",
+            "Pickup store",
+            "Desired pickup date",
+            "Requested at (UTC)",
+            "Delivery method",
+        ):
+            self.assertEqual(sum(metric.label == label for metric in app.metric), 7)
+        self.assertIn("2026-10-12 06:35", [metric.value for metric in app.metric])
+        self.assertIn("10,000", [metric.value for metric in app.metric])
+        self.assertIn("Limited stock needs verification", page_text(app))
+        self.assertIn("REQ-007", page_text(app))
 
     def test_ml_modes_prompt_for_training_without_saved_models(self):
         app = self.open_app()
@@ -87,12 +109,21 @@ class StreamlitUiTests(unittest.TestCase):
     def test_train_and_reload_models_for_ml_evaluation(self):
         app = self.open_app()
         app.number_input(key="train_c").set_value(0.5)
-        app.button(key="train_submit").click().run()
+        app.button(key="train_submit").click().run(timeout=60)
 
         self.assertFalse(app.exception)
         self.assertTrue((self.directory / "latest.skops").exists())
         self.assertIn("Training complete", page_text(app))
         self.assertIn("Latest saved model: C = 0.5", page_text(app))
+        self.assertIn("Validation and test metrics", page_text(app))
+        self.assertIn("Precision", page_text(app))
+        self.assertIn("Recall", page_text(app))
+        self.assertIn("70%", page_text(app))
+        self.assertEqual(len(app.table), 2)
+        self.assertEqual(len(app.table[1].value), 6)
+        self.assertEqual(
+            set(app.table[1].value["Split"]), {"Validation", "Test"}
+        )
         self.assertNotIn("No saved models yet", page_text(app))
         self.assertEqual(app.progress[0].value, 100)
 
@@ -104,6 +135,7 @@ class StreamlitUiTests(unittest.TestCase):
         self.assertFalse(reloaded.exception)
         self.assertIn("REJECT", page_text(reloaded))
         self.assertIn("C = 0.5", page_text(reloaded))
+        self.assertIn("Precision", page_text(reloaded))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,362 @@
+[
+  {
+    "lane_id": "DC-S1",
+    "source_id": "DC-001",
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S2",
+    "source_id": "DC-001",
+    "destination_id": "STORE-002",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S3",
+    "source_id": "DC-001",
+    "destination_id": "STORE-003",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S4",
+    "source_id": "DC-001",
+    "destination_id": "STORE-004",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S5",
+    "source_id": "DC-001",
+    "destination_id": "STORE-005",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S6",
+    "source_id": "DC-001",
+    "destination_id": "STORE-006",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S7",
+    "source_id": "DC-001",
+    "destination_id": "STORE-007",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S8",
+    "source_id": "DC-001",
+    "destination_id": "STORE-008",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S9",
+    "source_id": "DC-001",
+    "destination_id": "STORE-009",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC-S10",
+    "source_id": "DC-001",
+    "destination_id": "STORE-010",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S1",
+    "source_id": "DC-002",
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S2",
+    "source_id": "DC-002",
+    "destination_id": "STORE-002",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S3",
+    "source_id": "DC-002",
+    "destination_id": "STORE-003",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S4",
+    "source_id": "DC-002",
+    "destination_id": "STORE-004",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S5",
+    "source_id": "DC-002",
+    "destination_id": "STORE-005",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S6",
+    "source_id": "DC-002",
+    "destination_id": "STORE-006",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S7",
+    "source_id": "DC-002",
+    "destination_id": "STORE-007",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S8",
+    "source_id": "DC-002",
+    "destination_id": "STORE-008",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S9",
+    "source_id": "DC-002",
+    "destination_id": "STORE-009",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC2-S10",
+    "source_id": "DC-002",
+    "destination_id": "STORE-010",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S1",
+    "source_id": "DC-003",
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S2",
+    "source_id": "DC-003",
+    "destination_id": "STORE-002",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S3",
+    "source_id": "DC-003",
+    "destination_id": "STORE-003",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S4",
+    "source_id": "DC-003",
+    "destination_id": "STORE-004",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S5",
+    "source_id": "DC-003",
+    "destination_id": "STORE-005",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S6",
+    "source_id": "DC-003",
+    "destination_id": "STORE-006",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S7",
+    "source_id": "DC-003",
+    "destination_id": "STORE-007",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S8",
+    "source_id": "DC-003",
+    "destination_id": "STORE-008",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S9",
+    "source_id": "DC-003",
+    "destination_id": "STORE-009",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "DC3-S10",
+    "source_id": "DC-003",
+    "destination_id": "STORE-010",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 1,
+    "transit_days": 1
+  },
+  {
+    "lane_id": "S1-S1",
+    "source_id": "STORE-001",
+    "destination_id": "STORE-001",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S2-S2",
+    "source_id": "STORE-002",
+    "destination_id": "STORE-002",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S3-S3",
+    "source_id": "STORE-003",
+    "destination_id": "STORE-003",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S4-S4",
+    "source_id": "STORE-004",
+    "destination_id": "STORE-004",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S5-S5",
+    "source_id": "STORE-005",
+    "destination_id": "STORE-005",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S6-S6",
+    "source_id": "STORE-006",
+    "destination_id": "STORE-006",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S7-S7",
+    "source_id": "STORE-007",
+    "destination_id": "STORE-007",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S8-S8",
+    "source_id": "STORE-008",
+    "destination_id": "STORE-008",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S9-S9",
+    "source_id": "STORE-009",
+    "destination_id": "STORE-009",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  },
+  {
+    "lane_id": "S10-S10",
+    "source_id": "STORE-010",
+    "destination_id": "STORE-010",
+    "delivery_type": "STORE_PICKUP",
+    "cutoff_hour_utc": 16,
+    "processing_days": 0,
+    "transit_days": 0
+  }
+]

@@ -1,0 +1,152 @@
+[
+  {
+    "product_id": "SKU-001",
+    "name": "13 mm gypsum plasterboard",
+    "category": "BOARD"
+  },
+  {
+    "product_id": "SKU-002",
+    "name": "Galvanized steel wood screws",
+    "category": "FASTENER"
+  },
+  {
+    "product_id": "SKU-003",
+    "name": "Mineral wool insulation batts",
+    "category": "INSULATION"
+  },
+  {
+    "product_id": "SKU-004",
+    "name": "Interior matte wall paint",
+    "category": "PAINT"
+  },
+  {
+    "product_id": "SKU-005",
+    "name": "Copper electrical cable",
+    "category": "ELECTRICAL"
+  },
+  {
+    "product_id": "SKU-006",
+    "name": "PVC water supply pipe",
+    "category": "PLUMBING"
+  },
+  {
+    "product_id": "SKU-007",
+    "name": "Galvanized corner brackets",
+    "category": "HARDWARE"
+  },
+  {
+    "product_id": "SKU-008",
+    "name": "Cordless drill driver",
+    "category": "TOOL"
+  },
+  {
+    "product_id": "SKU-009",
+    "name": "Oak laminate flooring planks",
+    "category": "FLOORING"
+  },
+  {
+    "product_id": "SKU-010",
+    "name": "Construction adhesive cartridges",
+    "category": "ADHESIVE"
+  },
+  {
+    "product_id": "SKU-011",
+    "name": "Moisture-resistant gypsum board",
+    "category": "BOARD"
+  },
+  {
+    "product_id": "SKU-012",
+    "name": "Stainless steel bolts",
+    "category": "FASTENER"
+  },
+  {
+    "product_id": "SKU-013",
+    "name": "Rigid foam insulation panels",
+    "category": "INSULATION"
+  },
+  {
+    "product_id": "SKU-014",
+    "name": "Exterior masonry paint",
+    "category": "PAINT"
+  },
+  {
+    "product_id": "SKU-015",
+    "name": "Double electrical outlet",
+    "category": "ELECTRICAL"
+  },
+  {
+    "product_id": "SKU-016",
+    "name": "Brass pipe fittings",
+    "category": "PLUMBING"
+  },
+  {
+    "product_id": "SKU-017",
+    "name": "Heavy-duty door hinges",
+    "category": "HARDWARE"
+  },
+  {
+    "product_id": "SKU-018",
+    "name": "Tape measure",
+    "category": "TOOL"
+  },
+  {
+    "product_id": "SKU-019",
+    "name": "Ceramic floor tiles",
+    "category": "FLOORING"
+  },
+  {
+    "product_id": "SKU-020",
+    "name": "Tile mortar bags",
+    "category": "ADHESIVE"
+  },
+  {
+    "product_id": "SKU-021",
+    "name": "Cement backer board",
+    "category": "BOARD"
+  },
+  {
+    "product_id": "SKU-022",
+    "name": "Drywall anchor screws",
+    "category": "FASTENER"
+  },
+  {
+    "product_id": "SKU-023",
+    "name": "Fiberglass insulation rolls",
+    "category": "INSULATION"
+  },
+  {
+    "product_id": "SKU-024",
+    "name": "Wood primer",
+    "category": "PAINT"
+  },
+  {
+    "product_id": "SKU-025",
+    "name": "LED ceiling light",
+    "category": "ELECTRICAL"
+  },
+  {
+    "product_id": "SKU-026",
+    "name": "PEX tubing",
+    "category": "PLUMBING"
+  },
+  {
+    "product_id": "SKU-027",
+    "name": "Adjustable shelf brackets",
+    "category": "HARDWARE"
+  },
+  {
+    "product_id": "SKU-028",
+    "name": "Circular saw blade",
+    "category": "TOOL"
+  },
+  {
+    "product_id": "SKU-029",
+    "name": "Vinyl floor planks",
+    "category": "FLOORING"
+  },
+  {
+    "product_id": "SKU-030",
+    "name": "Silicone sealant tubes",
+    "category": "ADHESIVE"
+  }
+]

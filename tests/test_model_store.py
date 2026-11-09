@@ -14,11 +14,19 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from promise_poc.data import SAMPLE_PATH, load_sample_data  # noqa: E402
 from promise_poc.engine import evaluate  # noqa: E402
-from promise_poc.ml import TrainingConfig, train_models  # noqa: E402
+from promise_poc.ml import TrainingConfig, train_models, train_models_with_report  # noqa: E402
 from ui.model_store import MAX_MODEL_BYTES, ModelStore, ModelStoreError  # noqa: E402
 
 
 class ModelStoreTests(unittest.TestCase):
+    def test_saved_training_report_is_available_after_reload(self):
+        models, reports = train_models_with_report(load_sample_data())
+
+        self.store.save(models, TrainingConfig(), SAMPLE_PATH, reports)
+        saved = ModelStore(self.directory).load(SAMPLE_PATH)
+
+        self.assertEqual(saved.report, reports)
+
     def setUp(self):
         self.directory = (ROOT / ".tmp" / f"model-test-{uuid4().hex}").resolve()
         self.assertTrue(self.directory.is_relative_to((ROOT / ".tmp").resolve()))
@@ -68,8 +76,10 @@ class ModelStoreTests(unittest.TestCase):
 
     def test_changed_sample_requires_retraining(self):
         self.store.save(train_models(load_sample_data()), TrainingConfig(), SAMPLE_PATH)
-        other_sample = self.directory / "other.json"
-        other_sample.write_text("{}", encoding="utf-8")
+        other_sample = self.directory / "data-copy"
+        shutil.copytree(SAMPLE_PATH, other_sample)
+        events_path = other_sample / "events.json"
+        events_path.write_text(events_path.read_text(encoding="utf-8") + " ", encoding="utf-8")
 
         with self.assertRaisesRegex(ModelStoreError, "Retrain"):
             self.store.load(other_sample)
