@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/promise_poc/__init__.py
+src/promise_poc/__main__.py
+src/promise_poc/data.py
+src/promise_poc/engine.py
+src/promise_poc/features.py
+src/promise_poc/ml.py
+src/promise_poc/rules.py
+src/promise_poc.egg-info/PKG-INFO
+src/promise_poc.egg-info/SOURCES.txt
+src/promise_poc.egg-info/dependency_links.txt
+src/promise_poc.egg-info/requires.txt
+src/promise_poc.egg-info/top_level.txt
+tests/test_promise.py

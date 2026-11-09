@@ -1,0 +1,4 @@
+scikit-learn>=1.6,<2
+streamlit>=1.67,<2
+skops>=0.16,<0.17
+ruff>=0.17.4,<0.18

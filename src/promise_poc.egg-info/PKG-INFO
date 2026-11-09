@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: promise-poc
+Version: 0.1.0
+Summary: Small rule and ML Promise Engine demonstration
+Requires-Python: >=3.13
+Requires-Dist: scikit-learn<2,>=1.6

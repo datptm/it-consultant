@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.deps/
+.venv/
+.venv313/
+.pip-cache/
+.uv-cache/
+.tmp/
+.ruff_cache/
+ui/.local/
