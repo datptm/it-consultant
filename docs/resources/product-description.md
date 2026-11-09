@@ -1,356 +1,356 @@
-# Promise Hub: tổng hợp ý tưởng, phương pháp và hướng triển khai MVP
+# Promise Hub: ideas, methodology, and MVP implementation approach
 
-**IT Consultant Challenge 2026 · Vòng 1 · Công ty A (nhà bán lẻ vật liệu xây dựng Đan Mạch)**
+**IT Consultant Challenge 2026 · Round 1 · Company A (Danish building materials retailer)**
 
-> *"Khách hàng không mua con số tồn kho. Họ mua một lời hứa mà chúng ta giữ được."*
+> *"Inventory doesn't sell. Customers buy the promise we keep."*
 
-> **Lưu ý:** mọi con số trong tài liệu (số cửa hàng, baseline, KPI, chi phí giờ công...) là **giả định của nhóm** để minh họa lập luận, cần được đo và xác nhận ở tuần đầu của MVP.
+> **Note:** All figures in this document (store counts, baselines, KPIs, labor costs, etc.) are **the team's assumptions** for illustration and must be measured and confirmed in the MVP's first week.
 
 ---
 
-## 1. Tóm tắt điều hành
+## 1. Executive summary
 
-| Nội dung | Tóm tắt |
+| Content | Summary |
 |---|---|
-| **Vấn đề chọn** | Hệ thống phân mảnh: mỗi nước trả lời câu hỏi "có hàng không, bao giờ giao được?" theo một cách khác nhau và không ai hoàn toàn tin câu trả lời. |
-| **Quan điểm cốt lõi** | Phân mảnh là **nguyên nhân gốc** của ba thách thức còn lại (thủ công, vận hành không nhất quán, giao hàng kém tin cậy). |
-| **Giải pháp** | **Promise Hub**: một lớp dữ liệu và tích hợp dùng chung đặt trên các hệ thống hiện có (ERP, POS, WMS), cung cấp thông tin sản phẩm, tồn kho và ngày giao **kèm điểm tin cậy**. |
-| **Điểm khác biệt** | Không giấu sai số của dữ liệu tồn kho, mà **đo lường và hành động theo nó**: mỗi câu trả lời có độ tin cậy để nhân viên biết khi nào nên hứa, khi nào nên xác minh. |
-| **MVP** | 12 tuần, thí điểm tại Thụy Điển, khoảng 15 cửa hàng và 1 trung tâm phân phối, chỉ đọc dữ liệu, không thay thế ERP. |
-| **Nhân rộng** | Lõi dùng chung, adapter và cấu hình riêng từng nước; mỗi nước có một "chiến thắng đầu tiên" khác nhau từ cùng một nền tảng. |
+| **Chosen problem** | Fragmented systems: each country answers "Do we have it in stock? When can it be delivered?" differently, and no one fully trusts the answer. |
+| **Core perspective** | Fragmentation is the **root cause** of the three remaining challenges (manual, inconsistent operations, unreliable delivery). |
+| **Solution** | **Promise Hub**: a shared data layer and integration built on existing systems (ERP, POS, WMS), providing product information, inventory, and delivery date **with reliability**. |
+| **Differentiator** | Rather than hiding inventory inaccuracies, **measure and act on them**: each answer has a confidence level so staff know when to promise and when to verify. |
+| **MVP** | 12 weeks, pilot in Sweden, around 15 stores and 1 distribution center, only read data, no ERP replacement. |
+| **Scale** | Shared core, adapters and country-specific configurations; each country has a "first win" different from the same platform. |
 
 ---
 
-## 2. Bối cảnh và bài toán
+## 2. Context and problem
 
-Công ty A là nhà bán lẻ vật liệu xây dựng hàng đầu Đan Mạch với hàng trăm cửa hàng tại Đan Mạch, Na Uy và Thụy Điển, phục vụ cả doanh nghiệp xây dựng (B2B) lẫn người tiêu dùng (B2C). Theo đề bài:
+Company A is a leading Danish building materials retailer with hundreds of stores across Denmark, Norway, and Sweden, serving both businesses (B2B) and consumers (B2C). According to the challenge brief:
 
-- Mỗi nước và khu vực đã tự phát triển hệ thống và quy trình thủ công riêng.
-- Bốn thách thức liên quan lẫn nhau: **quy trình thủ công, vận hành không nhất quán, giao hàng và xử lý đơn, hệ thống phân mảnh**.
-- Mức độ cấp bách khác nhau theo nước (đề dùng chữ "may", tức chỉ là gợi ý): Đan Mạch nghiêng về quy trình thủ công, Na Uy về vận hành cửa hàng, Thụy Điển về giao hàng.
-- Ban điều hành chỉ muốn đầu tư **một** giải pháp số, nhưng không thể triển khai giống hệt nhau ở ba nước.
-- Thị trường cạnh tranh cao, thời gian ra thị trường (time to market) là yếu tố then chốt.
+- Each country and region has developed its own systems and manual processes.
+- Four related challenges: **manual processes, inconsistent operations, delivery and order handling, and fragmented systems**.
+- Urgency differs by country (the brief says these issues *may* be especially relevant): Denmark leans toward manual processes, Norway toward store operations, and Sweden toward delivery.
+- Management only wants to invest in **one** digital solution, but cannot implement it identically across the three countries.
+- Highly competitive market, time to market is the key factor.
 
-**Câu hỏi trung tâm:** *Công ty A nên tập trung vào đâu trước?*
+**Core question:** *Which area should Company A focus on first?*
 
 ---
 
-## 3. Xác định vấn đề (Identify)
+## 3. Identify the issue (Identify)
 
-### 3.1. Vấn đề không phải là "nhiều hệ thống", mà là "mất niềm tin vào câu trả lời"
+### 3.1. The problem is a loss of trust in answers
 
-Nói "mỗi nước dùng hệ thống khác nhau" mới chỉ là bề mặt. Vấn đề thật là: tại một thời điểm cụ thể, nhân viên cửa hàng không thể trả lời nhanh và chắc chắn câu hỏi **"sản phẩm này là gì, giá bao nhiêu, còn ở đâu, bao giờ giao được?"**
+Saying that each country uses different systems only describes the surface. At a specific moment, store staff cannot answer confidently and quickly: **What is this product, what does it cost, where is it available, and when can it be delivered?**
 
-### 3.2. Chuỗi nhân quả
+### 3.2. Cause and effect chain
 
 ```
-Mỗi nước tự xây hệ thống (lịch sử, sáp nhập, nhu cầu địa phương)
-   → Dữ liệu sản phẩm, giá, tồn kho khác nhau, không đồng bộ
-      → Nhân viên gọi điện, dùng Excel, đối soát tay      (= quy trình thủ công)
-      → Mỗi cửa hàng trả lời khách một kiểu               (= vận hành không nhất quán)
-      → Hứa sai ngày giao, giao trễ                       (= giao hàng kém tin cậy)
-         → Mọi cải tiến phải làm lại ba lần, khó nhân rộng
+Each country builds its own systems (history, acquisitions, local needs)
+   → Product, price, and inventory data diverge and fall out of sync
+      → Staff call, use spreadsheets, and reconcile manually (= manual processes)
+      → Stores give customers different answers          (= inconsistent operations)
+      → Wrong delivery promises and late deliveries       (= unreliable delivery)
+         → Every improvement must be repeated three times and is hard to scale
 ```
 
-Ba thách thức còn lại phần lớn là **triệu chứng**; phân mảnh là **nguyên nhân gốc chung**.
+The other three challenges are largely **symptoms**; fragmentation is the **root cause**.
 
-### 3.3. Bối cảnh ngành hỗ trợ lập luận
+### 3.3. Industry context supporting the argument
 
-- Các nước Bắc Âu có chuẩn dữ liệu sản phẩm ngành riêng (**NOBB** ở Na Uy, **FINFO** ở Thụy Điển, **Byggebasen** ở Đan Mạch), nên dữ liệu sản phẩm không tự đồng nhất giữa các nước.
-- Ngành phân phối vật liệu xây dựng Bắc Âu đang hợp nhất qua mua bán sáp nhập, và đây gần như chắc chắn là một nguồn gốc của sự phân mảnh. Đối thủ lớn lên nhanh nên chậm trễ là rủi ro cạnh tranh.
-- ERP thường không được thiết kế để làm "nguồn dữ liệu sản phẩm cho kênh số", nên sự phân mảnh lộ rõ nhất khi dữ liệu phải đi ra cửa hàng, web và khách B2B.
+- Nordic countries have industry-specific product data standards (**NOBB** in Norway, **FINFO** in Sweden, **Byggebasen** in Denmark), so product data is not self-consistent across countries.
+- Mergers and acquisitions are consolidating the Nordic building materials industry and are likely to contribute to fragmentation. Competitors' rapid growth increases the cost of delays.
+- ERP systems are generally not designed to serve as a digital channel's product data source, so fragmentation becomes most visible when data must reach stores, the web, and B2B customers.
 
-### 3.4. Ai gặp vấn đề
+### 3.4. Who is affected
 
-| Nhóm | Nỗi đau |
+| Group | Pain point |
 |---|---|
-| Nhân viên quầy/cửa hàng | Không chắc còn hàng, phải gọi cửa hàng khác hoặc kho, mỗi nước một giao diện |
-| Khách B2B (nhà thầu, thợ) | Cần biết chắc hàng có và ngày giao để không dừng công trình; giao sai hẹn là mất khách |
-| Khách cá nhân (DIY) | Web ghi còn hàng nhưng đến cửa hàng thì hết |
-| Điều phối giao hàng, kho | Lập kế hoạch trên dữ liệu trễ hoặc sai |
-| Quản lý dữ liệu sản phẩm | Đưa một sản phẩm mới ra ba thị trường phải nhập và chuẩn hóa nhiều lần |
-| Ban điều hành, IT tập đoàn | Không có số liệu hợp nhất, mỗi cải tiến phải làm lại cho từng nước |
+| Counter/cashier staff | Uncertain stock availability; must contact another store or warehouse, each country has a different interface |
+| B2B customers (contractors, craftsmen) | Need to be certain of stock availability and delivery date to avoid project delays; incorrect delivery schedule results in lost customers |
+| Individual customers (DIY) | Website shows stock available but store is out of stock |
+| Order fulfillment and warehouse management | Planning based on delayed or incorrect data |
+| Product data management | Introducing a new product to three markets requires multiple entries and standardization steps |
+| Executive Board, IT Group | No consolidated data; each improvement must be redone for each country |
 
-**Persona chính của MVP:** nhân viên quầy phục vụ khách B2B (nhà thầu).
+**Primary MVP persona:** a counter employee serving B2B customers (contractors).
 
-**Kịch bản minh họa (giả định):** 7 giờ sáng, nhà thầu cần 60 tấm thạch cao giao vào thứ Năm. Hệ thống tại quầy báo "còn hàng". Nhân viên gọi cửa hàng khác và kho, mất 3 cuộc gọi, 40 phút, rồi hứa thứ Năm. Thực tế hàng đến thứ Sáu và công trình dừng một ngày.
+**Illustrative scenario (hypothetical):** At 7 a.m., a contractor needs 60 sheets of drywall delivered by Thursday. The counter system says "in stock." The employee calls other stores and warehouses, makes three calls, spends 40 minutes, and promises Thursday. The goods actually arrive on Friday, stopping the project for a day.
 
 ---
 
-## 4. Ưu tiên hóa (Prioritise)
+## 4. Prioritization
 
-### 4.1. Ma trận chấm điểm
+### 4.1. Scoring Matrix
 
-Nhóm chấm điểm 1 đến 5 (đánh giá chủ quan dựa trên thông tin đề bài):
+Score each option from 1 to 5 (subjective judgment based on the brief):
 
-| Tiêu chí (trọng số) | Thủ công | Vận hành cửa hàng | Giao hàng | **Phân mảnh** |
+| Criteria (weight) | Manual | Store operations | Delivery | **Fragmentation** |
 |---|---|---|---|---|
-| Phạm vi ảnh hưởng ba nước (25%) | 3 | 3 | 3 | **5** |
-| Là nguyên nhân gốc, nền tảng (20%) | 2 | 3 | 2 | **5** |
-| Tốc độ ra giá trị với MVP (20%) | 4 | 2 | 3 | 3 |
-| Tính khả thi, rủi ro (15%) | 4 | 2 | 3 | 3 |
-| Đo lường được ROI (10%) | 4 | 2 | 4 | 4 |
-| Tiềm năng AI (10%) | 4 | 3 | 4 | 4 |
-| **Điểm có trọng số** | 3,35 | 2,55 | 3,00 | **4,10** |
+| Impact across three countries (25%) | 3 | 3 | 3 | **5** |
+| Root cause and foundation (20%) | 2 | 3 | 2 | **5** |
+| Speed to Value with MVP (20%) | 4 | 2 | 3 | 3 |
+| Feasibility, Risk (15%) | 4 | 2 | 3 | 3 |
+| Measurable ROI (10%) | 4 | 2 | 4 | 4 |
+| AI potential (10%) | 4 | 3 | 4 | 4 |
+| **Weighted score** | 3,35 | 2,55 | 3,00 | **4,10** |
 
-### 4.2. Vì sao không chọn ba vấn đề còn lại
+### 4.2. Why Not Choose the Remaining Three Issues
 
-- **Quy trình thủ công:** có thể cho kết quả nhanh, nhưng tự động hóa trên dữ liệu chưa đáng tin chỉ làm lỗi chạy nhanh hơn.
-- **Giao hàng và xử lý đơn:** lời hứa giao hàng phụ thuộc vào việc dữ liệu tồn kho đáng tin trước.
-- **Vận hành cửa hàng:** muốn chuẩn hóa cách làm việc thì cần dữ liệu và công cụ nhất quán trước.
+- **Manual Process:** Can deliver results quickly, but automation on data is not reliable and tends to cause more errors.
+- **Shipping and Order Processing:** Delivery promises depend on having reliable inventory data beforehand.
+- **Store Operations:** To standardize workflows, consistent data and tools must be in place first.
 
-### 4.3. Thừa nhận đánh đổi
+### 4.3. Acknowledged Trade-offs
 
-Nếu làm theo kiểu "big-bang" (hợp nhất toàn bộ hệ thống), phân mảnh sẽ chậm và rủi ro, điểm tốc độ và khả thi thấp. Vì vậy MVP được thiết kế là **lớp mỏng chạy trên hệ thống cũ, không thay ERP**.
+A "big bang" attempt to integrate every system would be slow and risky. The MVP therefore uses a **thin layer over existing systems, without replacing the ERP**.
 
 ---
 
-## 5. Giải pháp: Promise Hub
+## 5. Solution: Promise Hub
 
-### 5.1. Kiến trúc năm lớp
+### 5.1. Five-layer architecture
 
-| Lớp | Thành phần |
+| Layer | Component |
 |---|---|
-| **Trải nghiệm** | Store Assistant App (web/tablet), widget tình trạng hàng cho cổng B2B và web, dashboard điều phối |
-| **Dịch vụ dùng chung** | Product Master, Unified Inventory, **Promise Engine** (ATP kèm độ tin cậy), Search |
-| **Mô hình dữ liệu chuẩn** | Product (ánh xạ NOBB/FINFO/Byggebasen), Price, Stock, Delivery Promise |
-| **Tích hợp** | API gateway, luồng sự kiện (event streaming), **adapter riêng từng nước** |
-| **Nguồn dữ liệu** | ERP, POS, WMS, TMS, feed nhà cung cấp, thương mại điện tử |
+| **Experience** | Store Assistant App (web/tablet), B2B portal and website status widgets, management dashboard |
+| **Shared Services** | Product Master, Unified Inventory, **Promise Engine** (ATP with reliability), Search |
+| **Standard Data Model** | Product (mapping NOBB/FINFO/Byggebasen), Price, Stock, Delivery Promise |
+| Integration | API gateway, event streaming, **country-specific adapter** |
+| **Data source** | ERP, POS, WMS, TMS, supplier feed, e-commerce |
 
-### 5.2. Nguyên tắc thiết kế
+### 5.2. Design principles
 
-1. **Strangler approach:** không thay thế hệ thống cũ, bọc và đọc dữ liệu qua adapter; giai đoạn đầu chỉ đọc (read-only) để giảm rủi ro.
-2. **Lõi dùng chung, adapter tùy biến theo nước:** khớp với yêu cầu "một giải pháp chiến lược không đồng nghĩa một cách triển khai giống hệt nhau".
-3. **API-first, ưu tiên cấu hình hoặc mua sẵn hơn tự xây** để rút ngắn time to market.
-4. **Chủ quyền dữ liệu:** hạ tầng đặt tại EU, tuân thủ GDPR, có nhật ký kiểm toán. Điều này khớp định hướng "phát triển ở châu Âu cho châu Âu" của ban tổ chức.
+1. **Strangler approach:** do not replace the old system, wrap and read data through the adapter; initial phase is read-only to reduce risk.
+2. **Shared core, country-specific adapters:** aligns with the requirement "a strategic solution does not mean identical implementation."
+3. **API first; favor configuration and ready-made components over custom development** to reduce time to market.
+4. **Data sovereignty:** infrastructure located in EU, GDPR compliance, audit logs. This aligns with the organizers' "developing for Europe, by Europe" direction.
 
 ---
 
-## 6. Tính năng cốt lõi: lời hứa có độ tin cậy
+## 6. Core feature: a reliable promise
 
-### 6.1. Ý tưởng
+### 6.1. Concept
 
-Dữ liệu tồn kho **luôn có sai số**. Thay vì hiển thị một con số như thể nó chắc chắn, Promise Hub hiển thị con số **kèm điểm tin cậy** và thời điểm xác minh gần nhất. Ví dụ trên màn hình nhân viên:
+Inventory data **always has some uncertainty**. Instead of displaying a number as certain, Promise Hub shows it **with a confidence score** and the last verification time. Example staff screen:
 
 ```
-Tấm thạch cao 13 mm chống ẩm  (mã sản phẩm đã hài hòa NOBB/FINFO/Byggebasen)
-Cửa hàng: 40 tấm · Độ tin cậy 92% · kiểm lần cuối 2 giờ trước
-Kho (DC): 1.200 tấm · Độ tin cậy 97%
-Giao hàng: thứ Năm · Xác suất đúng hạn 90%
-[Hứa với khách]   [Xác minh tồn kho]   [Báo sai lệch]
+13 mm moisture-resistant plasterboard (product code harmonized across NOBB/FINFO/Byggebasen)
+Store: 40 sheets · Confidence 92% · Last checked 2 hours ago
+Distribution center: 1,200 sheets · Confidence 97%
+Delivery: Thursday · On-time probability 90%
+[Promise to customer]   [Verify inventory]   [Report discrepancy]
 ```
 
-### 6.2. Cách tính điểm tin cậy
+### 6.2. Reliability score calculation
 
-**Đầu vào (tín hiệu):**
-- thời gian kể từ lần kiểm kho gần nhất,
-- tốc độ xuất nhập của mặt hàng (hàng xoay nhanh dễ sai lệch hơn),
-- tỷ lệ sai lệch lịch sử theo mặt hàng và theo địa điểm,
-- số giao dịch chưa đồng bộ,
-- độ trễ của hệ thống nguồn,
-- loại sản phẩm (hàng rời, hàng nhỏ lẻ, hàng cồng kềnh).
+**Input (signal):**
+- Time since last inventory check,
+- Item throughput rate (faster rotation items are more error-prone),
+- Historical error rates by item and location,
+- Number of unsynchronized transactions,
+- Source system latency,
+- Product type (discrete, small items, bulky items).
 
-**Ba dải hành động:**
+**Action bands:**
 
-| Dải | Ý nghĩa | Hành động gợi ý |
+| Band | Meaning | Suggested action |
 |---|---|---|
-| 🟢 Cao | Đủ tin cậy | Hứa với khách ngay |
-| 🟡 Trung bình | Cần xác minh | Quét hoặc kiểm tra nhanh trước khi hứa |
-| 🔴 Thấp | Không đáng tin | Không hứa; gợi ý cửa hàng hoặc kho khác, hoặc ngày giao thận trọng hơn |
+| 🟢 High | Reliable | Promise immediately |
+| 🟡 Medium | Needs checking | Scan or count quickly before promising |
+| 🔴 Low | Unreliable | Do not promise; suggest another store, warehouse, or a more conservative delivery date |
 
-**Khởi động (cold start):**
-- Tuần 1 đến 6: chấm điểm theo **quy tắc** (ví dụ trừ điểm theo số ngày từ lần kiểm kho, giao dịch chưa đồng bộ, lịch sử sai lệch).
-- Từ tuần 7: chuyển sang **mô hình ML** huấn luyện trên lịch sử điều chỉnh tồn kho và nhật ký kiểm kho định kỳ từ ERP.
-- **Hiệu chỉnh:** so sánh xác suất dự đoán với kết quả kiểm kho thực tế (đường cong hiệu chỉnh, Brier score), để "92%" thực sự nghĩa là xấp xỉ 92% đúng.
+**Cold start:**
+- Weeks 1 to 6: score according to **rules** (e.g., deduct points based on days since last inventory check, unsynchronized transactions, historical discrepancies).
+- From week 7: move to an **ML model** trained on historical inventory adjustments and periodic ERP count logs.
+- **Calibration:** compare predicted probability with actual inventory check results (calibration curve, Brier score), to ensure "92%" truly means approximately 92% accurate.
 
-### 6.3. Vòng phản hồi (data flywheel)
+### 6.3. Feedback loop (data flywheel)
 
-Mỗi khi nhân viên chạm "xác nhận đúng" hoặc "báo sai lệch", dữ liệu được sửa và đồng thời trở thành nhãn huấn luyện cho mô hình. Nhân viên cửa hàng không bị thay thế bởi AI, mà trở thành **cảm biến chất lượng dữ liệu**, điều này cũng hỗ trợ việc chấp nhận thay đổi.
+Each time an employee clicks "Confirm" or "Incorrect," that feedback is recorded and becomes a training label. Staff become **data quality sensors**, supporting adoption of the change.
 
 ---
 
-## 7. Vai trò của AI
+## 7. AI's Role
 
-AI được dùng có chọn lọc, đúng loại kỹ thuật cho đúng việc:
+AI is used selectively, with the right technique for the right task:
 
-| Chức năng | Kỹ thuật | Giai đoạn | Lý do |
+| Function | Technique | Stage | Reason |
 |---|---|---|---|
-| Tính ngày giao | Quy tắc + ML | MVP | Ràng buộc cố định cộng độ trễ học từ lịch sử |
-| Chấm điểm tin cậy | ML cổ điển | MVP (quy tắc trước, ML sau) | Cần xác suất được hiệu chỉnh, chi phí thấp |
-| Phát hiện bất thường tồn kho | ML cổ điển | MVP-lite | Nhận diện mẫu trên dữ liệu số |
-| Hài hòa dữ liệu sản phẩm (ánh xạ thuộc tính, loại trùng, dịch Đan Mạch/Na Uy/Thụy Điển) | AI tạo sinh, có người duyệt | MVP | Dữ liệu văn bản phi cấu trúc, nhiều biến thể |
-| Bản nháp ánh xạ tích hợp và test | AI tạo sinh, lập trình viên duyệt | MVP (khi xây) | Giảm thời gian và chi phí mỗi adapter khi mở rộng |
-| Tìm kiếm ngôn ngữ tự nhiên ba thứ tiếng | AI tạo sinh, embeddings | MVP-lite hoặc giai đoạn 2 | Nhân viên và thợ mô tả, không nhớ mã |
-| Dự báo nhu cầu, dự đoán ngày giao nâng cao | ML | Giai đoạn 2 | Cần dữ liệu sạch từ Hub trước |
+| Delivery Date | Rule + ML | MVP | Fixed constraints plus learning delay from history |
+| Confidence scoring | Classical ML | MVP (rules first, ML later) | Needs calibrated probabilities at low cost |
+| Abnormal inventory detection | Classic ML | MVP-lite | Pattern recognition on structured data |
+| Product data harmonization (attribute mapping, duplicates, Danish/Norwegian/Swedish text) | Generative AI with human review | MVP | Unstructured text and many variants |
+| Draft integration mappings and tests | Generative AI with developer review | MVP (during development) | Reduce the time and cost of each adapter when scaling |
+| Natural language search in three languages | Generative AI, embeddings | MVP lite or Phase 2 | Staff can describe products without remembering codes |
+| Demand forecasting and improved delivery date prediction | ML | Phase 2 | Requires clean Hub data first |
 
-**Rào chắn (guardrails):** mô hình và dữ liệu đặt tại EU; ngưỡng độ tin cậy với người duyệt trong vòng lặp; nhật ký kiểm toán đầy đủ; các ca dùng này thuộc nhóm rủi ro thấp theo EU AI Act (cần xác nhận lại khi triển khai thật). Cần tính đến chi phí vận hành AI (token, đánh giá chất lượng).
+**Guardrails:** Keep models and data in the EU; use confidence thresholds and human review; retain full audit logs. The proposed uses appear low risk under the EU AI Act, but this must be checked before deployment. Also account for AI operating costs (tokens and quality evaluation).
 
 ---
 
-## 8. Hướng triển khai MVP
+## 8. Implementation of MVP
 
-### 8.1. Giả thuyết cần kiểm chứng
+### 8.1. Hypotheses to verify
 
-> *Nếu nhân viên và khách B2B có một nguồn sự thật duy nhất về sản phẩm, tồn kho và ngày giao, kèm độ tin cậy, thì thời gian tra cứu, số cuộc gọi đối soát và tỷ lệ hứa giao sai sẽ giảm rõ rệt.*
+> *If B2B employees and customers have a single source of truth for products, inventory, and delivery dates with confidence, then the time to lookup, number of control calls, and error rate in promised deliveries will decrease significantly.*
 
-### 8.2. Phạm vi
+### 8.2. Scope
 
-| Trong phạm vi | Ngoài phạm vi |
+| Within scope | Outside scope |
 |---|---|
-| 1 adapter ERP và 1 adapter POS/WMS tại nước thí điểm (chỉ đọc) | Thay thế ERP |
-| Mô hình dữ liệu chuẩn cho nhóm SKU bán chạy (giả định 10.000 đến 20.000 SKU) | Định giá, tài chính, nhân sự |
-| Hài hòa dữ liệu sản phẩm có AI hỗ trợ | Dựng lại toàn bộ thương mại điện tử |
-| Tồn kho hợp nhất và Promise Engine cho khoảng 15 cửa hàng và 1 trung tâm phân phối | Ghi ngược (write-back) mọi loại đơn hàng |
-| Store Assistant App: tìm kiếm, xem tồn kho cửa hàng/kho lân cận, ngày giao dự kiến, báo lỗi dữ liệu | Logistics xuyên biên giới, dự báo nâng cao |
+| 1 ERP adapter and 1 POS/WMS adapter at the pilot country (read-only) | ERP replacement |
+| Standard data model for popular SKUs (assumed 10,000 to 20,000 SKUs) | Pricing, finance, HR |
+| AI-assisted product data harmonization | Rebuild entire e-commerce |
+| Unified inventory and Promise Engine for approximately 15 stores and 1 distribution center | Write-back all order types |
+| Store Assistant App: search; nearby store and warehouse inventory; estimated delivery dates; data error reporting | Cross-border logistics, advanced forecasting |
 | Dashboard KPI | |
 
-**Vì sao thí điểm ở Thụy Điển (giả định):** đề nêu giao hàng và xử lý đơn là điểm đau lớn ở đó, nên giá trị của "ngày giao đáng tin" thể hiện nhanh nhất. Phương án thay thế là Đan Mạch (thị trường nhà, phối hợp dễ hơn).
+**Why Sweden for the pilot (hypothetical):** The brief identifies delivery and order handling as major pain points there, so the value of a reliable delivery date should become clear quickly. Denmark is an alternative pilot location because it is the home market and may be easier to coordinate.
 
-### 8.3. Lộ trình 12 tuần
+### 8.3. 12-Week Plan
 
-| Tuần | Hoạt động chính | Kết quả bàn giao |
+| Week | Main activities | Handover results |
 |---|---|---|
-| **1–2 Khám phá** | Phỏng vấn nhân viên và điều phối, chọn cửa hàng thí điểm và cửa hàng đối chứng, kiểm toán dữ liệu (mức trùng SKU, lấy mẫu độ chính xác tồn kho), thiết lập KPI nền, xin quyền truy cập API, rà soát bảo mật và GDPR | Báo cáo baseline, danh sách SKU ưu tiên, kế hoạch tích hợp |
-| **3–4 Nền tảng** | Mô hình dữ liệu chuẩn v1, adapter ERP chỉ đọc, đường ống sự kiện, pipeline hài hòa sản phẩm với hàng đợi duyệt cho người | Dữ liệu sản phẩm và tồn kho hợp nhất cho nhóm SKU ưu tiên |
-| **5–6 Lõi tính năng** | Unified Inventory, Promise Engine theo quy tắc, bản alpha Store Assistant, thử với 2 cửa hàng | Bản demo chạy được trên dữ liệu thật |
-| **7–8 Hoàn thiện** | Mô hình ML độ tin cậy v1, nút phản hồi, dashboard KPI, kiểm thử hiệu năng và bảo mật | Bản sẵn sàng thí điểm |
-| **9–10 Thí điểm** | Triển khai tại khoảng 15 cửa hàng và 1 DC, đào tạo, "champion" tại mỗi cửa hàng, họp đứng hằng ngày để thu phản hồi | Dữ liệu sử dụng thực tế |
-| **11–12 Đo và quyết định** | So sánh cửa hàng thí điểm với cửa hàng đối chứng tương đương, tổng kết, quyết định go/no-go, lập kế hoạch đợt tiếp theo | Báo cáo kết quả và đề xuất mở rộng |
+| **1–2 Discovery** | Interview staff and coordinators; select pilot and comparison stores; audit data (SKU duplicates, sampled inventory accuracy); establish baseline KPIs; obtain API access; review security and GDPR | Baseline report, priority SKU list, integration plan |
+| **3–4 Foundations** | Canonical data model v1; read-only ERP adapter; event pipeline; product harmonization with a human review queue | Unified product and inventory data for priority SKUs |
+| **5–6 Core features** | Unified Inventory; rules-based Promise Engine; Store Assistant alpha; test with two stores | Working demo with real data |
+| **7–8 Refinement** | Inventory confidence ML model v1; feedback button; KPI dashboard; performance and security tests | Pilot-ready release |
+| **9–10 Pilot** | Deploy to approximately 15 stores and one DC; train staff; assign a champion at each store; hold daily stand-ups for feedback | Real usage data |
+| **11–12 Measure and decide** | Compare pilot stores with similar control stores; summarize findings; make a go/no-go decision; plan the next phase | Results report and expansion recommendation |
 
-### 8.4. Đội ngũ gợi ý (khoảng 8 người)
+### 8.4. Suggested team (approximately eight people)
 
-Product owner, kiến trúc sư, 3 kỹ sư tích hợp/backend, 1 kỹ sư dữ liệu/AI, 1 UX/frontend, 1 QA.
+Product owner, architect, three integration/backend engineers, one data/AI engineer, one UX/frontend engineer, and one QA specialist.
 
-### 8.5. Cách đo hiệu quả
+### 8.5. Measuring effectiveness
 
-- Đo **baseline ở tuần 1** trước khi can thiệp.
-- Dùng **cửa hàng đối chứng** có quy mô và đặc điểm tương đồng để tách tác động của MVP khỏi yếu tố mùa vụ.
-- Theo dõi cả chỉ số kết quả (đúng hạn, thời gian tiết kiệm) lẫn chỉ số chấp nhận (tỷ lệ nhân viên dùng hằng tuần).
+- Measure **baseline at week 1** before intervention.
+- Use a **control store** with similar scale and characteristics to isolate the impact of MVP from seasonal factors.
+- Track outcome metrics (on-time performance, time saved) and adoption metrics (the share of staff using the tool weekly).
 
-### 8.6. Tiêu chí dừng hoặc điều chỉnh (go/no-go)
+### 8.6. Stop or go criteria (go/no-go)
 
-| Tiêu chí | Ngưỡng |
+| Criteria | Threshold |
 |---|---|
-| Độ chính xác tồn kho hiển thị | ≥ 92% |
-| Nhân viên quầy dùng hằng tuần | ≥ 60% |
-| Độ chính xác lời hứa giao đúng hạn | +5 điểm % so với baseline |
+| Inventory display accuracy | ≥ 92% |
+| Counter staff using it weekly | ≥ 60% |
+| On-time promise accuracy | 5 percentage points above baseline |
 
-**Nếu không đạt 2 trong 3 tiêu chí:** tạm dừng và điều chỉnh trước khi mở rộng, không tiếp tục đầu tư theo quán tính.
+**If not meeting 2 out of 3 criteria:** pause and adjust before scaling up, do not continue investing based on inertia.
 
 ---
 
-## 9. Tác động kinh doanh
+## 9. Business Impact
 
-| KPI | Baseline (giả định) | Mục tiêu thí điểm | Mục tiêu khi mở rộng |
+| KPI | Baseline (assumed) | Pilot Goal | Expansion Goal |
 |---|---|---|---|
-| Độ chính xác lời hứa giao đúng hạn | Đo ở tuần 1 | +5 điểm % | +10 điểm % |
-| Độ chính xác tồn kho hiển thị | ~85% | ≥ 92% | ≥ 95% |
-| Thời gian nhân viên mất cho tra cứu, gọi đối soát | Đo ở tuần 1 | −40% | −50% |
-| Thời gian chuẩn hóa dữ liệu sản phẩm mới | 4–6 tuần | ≤ 2 tuần | < 1 tuần |
-| Thời gian tích hợp một thị trường mới | 12 tháng trở lên | không áp dụng | < 6 tháng |
+| On-time promise accuracy | Measured in week 1 | +5 percentage points | +10 percentage points |
+| Inventory display accuracy | ~85% | ≥ 92% | ≥ 95% |
+| Time spent by staff for inquiry, reconciliation calls | Measured in Week 1 | −40% | −50% |
+| Product Data Standardization Time | 4–6 weeks | ≤ 2 weeks | < 1 week |
+| New Market Integration Time | 12 months or more | Not applicable | < 6 months |
 
-**Ví dụ tính ROI (số minh họa):**
+**ROI Example (Illustrative):**
 
-- Tiết kiệm công = số cửa hàng × số người dùng × phút tiết kiệm mỗi ngày × số ngày × giá giờ công.
-- Ví dụ: 300 cửa hàng × 3 người × 10 phút/ngày × 300 ngày ≈ 45.000 giờ/năm; với 35 EUR/giờ ≈ **1,6 triệu EUR/năm**.
-- Cộng thêm doanh thu giữ lại do giảm số đơn mất vì "không chắc có hàng" (cần doanh thu thật để tính).
-- Cần bổ sung ước lượng chi phí đầu tư MVP và thời gian hoàn vốn (nên có khoảng dao động).
+- Cost savings = number of stores × number of users × minutes saved per day × number of days × hourly labor cost.
+- Example: 300 stores × 3 users × 10 minutes/day × 300 days ≈ 45,000 hours/year; at 35 EUR/hour ≈ **1.6 million EUR/year**.
+- Add retained revenue from fewer lost orders caused by uncertainty about stock availability (actual revenue data is needed to calculate this).
+- Add an estimate of MVP investment costs and the payback period, preferably as ranges.
 
 ---
 
-## 10. Nhân rộng (Scale)
+## 10. Scale
 
-### 10.1. Lõi dùng chung và phần tùy biến
+### 10.1. Shared core and customization
 
-| Dùng chung (Global core) | Tùy biến theo nước (Local) |
+| Shared (Global core) | Country-specific (Local) |
 |---|---|
-| Mô hình dữ liệu chuẩn, hub tích hợp, API, bảo mật, giám sát | Adapter cho ERP/POS/WMS từng nước |
-| Promise Engine, thiết kế UX, mô hình AI | Chuẩn dữ liệu sản phẩm (NOBB, FINFO, Byggebasen), ngôn ngữ, tiền tệ (SEK, NOK, DKK) |
-| Quy trình quản trị dữ liệu | Quy tắc giao hàng, đối tác vận tải, thỏa thuận giá B2B |
-| | Đào tạo, quản lý thay đổi, tham vấn đại diện người lao động (cần kiểm tra yêu cầu từng nước) |
+| Standard data model, integrated hub, API, security, monitoring | Country-specific ERP/POS/WMS adapters |
+| Promise Engine, UX design, AI model | Product data standards (NOBB, FINFO, Byggebasen), language, currency (SEK, NOK, DKK) |
+| Data governance process | Shipping rules, transport partners, B2B pricing agreements |
+| | Training, change management, labor representative consultation (needs country-specific requirements check) |
 
-**Cấu hình thay cho mã:** khác biệt giữa các nước (quy tắc giao hàng, đơn vị, thuế, ngôn ngữ) được khai báo bằng cấu hình. Thêm một nước nghĩa là thêm một gói cấu hình và một adapter.
+**Configuration instead of code:** Differences between countries (shipping rules, units, taxes, language) are declared via configuration. Adding a country means adding a configuration package and an adapter.
 
-### 10.2. Một nền tảng, ba "chiến thắng đầu tiên"
+### 10.2. One platform, three early wins
 
-| Nước | Điểm đau theo đề | Giá trị đầu tiên từ Hub |
+| Country | Pain point from the brief | First value from the Hub |
 |---|---|---|
-| **Thụy Điển** (thí điểm) | Giao hàng, xử lý đơn | Ngày giao đáng tin cậy |
-| **Na Uy** (đợt 2) | Vận hành cửa hàng | Store Assistant chuẩn hóa trải nghiệm ở quầy |
-| **Đan Mạch** (đợt 3) | Quy trình thủ công | Tự động hóa chuẩn hóa dữ liệu, giảm đối soát tay |
+| **Sweden** (pilot) | Delivery and order handling | Reliable delivery dates |
+| **Norway** (round 2) | Store operations | Store Assistant standardizes the experience at the counter |
+| **Denmark** (third phase) | Manual processes | Automated data standardization and less manual reconciliation |
 
-### 10.3. Lộ trình
+### 10.3. Timeline
 
-Đợt 0 nền tảng và làm sạch dữ liệu → Đợt 1 Thụy Điển (12 tuần) → Đợt 2 Na Uy → Đợt 3 Đan Mạch → mở rộng chức năng giai đoạn 2 (đặt hàng, dự báo, cổng B2B).
+Phase 0 platform and data cleanup → Phase 1 Sweden (12 weeks) → Phase 2 Norway → Phase 3 Denmark → expand Phase 2 capabilities (ordering, forecasting, B2B portal).
 
-### 10.4. Ràng buộc triển khai
+### 10.4. Deployment constraints
 
-- **Mùa xây dựng cao điểm** (giả định xuân đến hè): tránh go-live và đào tạo trong giai đoạn này, đặt khung đóng băng thay đổi.
-- **Chất lượng dữ liệu nguồn:** cần bước làm sạch ở Đợt 0.
-- **Hiệu năng và độ trễ** khi đồng bộ gần thời gian thực.
-- **Chấp nhận của nhân viên:** dùng champion tại từng cửa hàng.
+- **Peak construction season** (assumed spring to summer): avoid go-live and training during this period, set a freeze period for changes.
+- **Source data quality:** requires data cleaning in Phase 0.
+- **Performance and latency** when synchronizing near real-time.
+- **Employee acceptance:** use champions at each store.
 
 ---
 
-## 11. Rủi ro và cách giảm
+## 11. Risks and mitigation
 
-| Rủi ro | Giảm thiểu |
+| Risks | Mitigation |
 |---|---|
-| Tranh chấp quyền sở hữu dữ liệu giữa các nước | Chủ sở hữu dữ liệu theo miền, hội đồng quản trị dữ liệu |
-| Dự án phình thành dự án thay ERP (scope creep) | Danh sách "ngoài phạm vi" được ký duyệt, các cổng go/no-go |
-| Nhân viên không dùng | Thiết kế cùng nhân viên cửa hàng, champion, theo dõi tỷ lệ sử dụng |
-| Phụ thuộc nhà cung cấp | API mở, kiến trúc tách lớp |
-| Dữ liệu nguồn quá kém | Đợt làm sạch dữ liệu; điểm tin cậy **phơi bày** vấn đề thay vì che giấu |
-| Thiếu dữ liệu lịch sử để huấn luyện ML | Khởi động bằng quy tắc, chuyển ML khi đủ dữ liệu |
+| Data ownership dispute between countries | Data ownership by region, data governance council |
+| Scope creep into an ERP replacement project | Signed-off out-of-scope list and go/no-go gates |
+| Employees not using | Design with store employees, champion, track usage ratio |
+| Supplier dependency | Open API, layered architecture |
+| Poor source data | Data cleanup phase; confidence scores **expose** problems instead of concealing them |
+| Lack of historical data for ML training | Kickstart with rules, switch to ML when sufficient data is available |
 
 ---
 
-## 12. Các giả định chính
+## 12. Main Assumptions
 
-1. Mỗi nước có ít nhất một ERP và hệ thống kho với API hoặc cơ chế xuất dữ liệu.
-2. Quy mô khoảng 300 cửa hàng (đề chỉ nói "hàng trăm").
-3. Thụy Điển có điểm đau về giao hàng đúng như ví dụ trong đề.
-4. Công ty chấp nhận hạ tầng cloud đặt tại EU.
-5. Các con số baseline, KPI và ROI chỉ mang tính minh họa, được xác nhận ở tuần 1.
-6. Mùa cao điểm ngành xây dựng là xuân đến hè.
+1. Each country has at least one ERP and a warehouse system with API or data export mechanism.
+2. Approximately 300 stores (the description refers to 'hundreds').
+3. Sweden has a delivery issue as per the example in the proposal.
+4. The company accepts EU-based cloud infrastructure.
+5. Baseline numbers, KPIs, and ROI are illustrative and confirmed by week 1.
+6. The construction industry peak season is spring to summer.
 
 ---
 
-## 13. Câu hỏi giám khảo có thể hỏi và hướng trả lời
+## 13. Questions judges may ask and suggested answers
 
-| Câu hỏi | Hướng trả lời |
+| Question | Response |
 |---|---|
-| Vì sao chọn phân mảnh mà không chọn vấn đề thiết thực hơn như giao hàng? | Phân mảnh là nguyên nhân gốc và chung cho cả ba nước; giao hàng và thủ công cần dữ liệu đáng tin trước. Đã có ma trận chấm điểm và thừa nhận đánh đổi. |
-| Không phải đây là dự án hợp nhất ERP kéo dài nhiều năm? | Không. Hub chạy trên hệ thống cũ, chỉ đọc, phạm vi 12 tuần, có tiêu chí dừng. |
-| Lấy dữ liệu đâu để huấn luyện mô hình tin cậy? | Khởi động bằng quy tắc, từ tuần 7 dùng lịch sử điều chỉnh tồn kho và kiểm kho từ ERP; vòng phản hồi của nhân viên bổ sung nhãn. |
-| Vì sao không dùng AI tạo sinh cho mọi thứ? | Mỗi chức năng dùng đúng kỹ thuật: tính ngày giao cần quy tắc và ML, còn ánh xạ thuộc tính hay tìm kiếm ngôn ngữ tự nhiên mới hợp AI tạo sinh. |
-| Làm sao biết MVP thành công? | KPI baseline đo ở tuần 1, cửa hàng đối chứng, ba tiêu chí go/no-go rõ ràng. |
-| Điều gì khác nhau giữa ba nước? | Lõi dùng chung; adapter, chuẩn dữ liệu, quy tắc giao hàng, đào tạo là phần riêng; mỗi nước có "chiến thắng đầu tiên" khác nhau. |
-| Chi phí và hoàn vốn? | Nêu ước lượng đội khoảng 8 người trong 12 tuần, so với lợi ích minh họa; xác nhận bằng số liệu pilot. |
+| Why choose fragmentation over more practical issues like delivery? | Fragmentation is the root and common cause for all three countries; delivery and manual processes require reliable data first. There is a scoring matrix and acknowledgment of trade-offs. |
+| Is this not a multi-year ERP consolidation project? | No. Hub runs on the old system, read-only, 12-week scope, with a stop criteria. |
+| Where will training data for the confidence model come from? | Begin with rules. From week 7, use historical inventory adjustments and counts from the ERP; staff feedback adds labels. |
+| Why not use AI generation for everything? | Each function uses the right technique: delivery date calculation requires rules and ML, while attribute mapping or natural language search is better suited for AI generation. |
+| How do you know the MVP is successful? | KPI baseline measured at week 1, control store, three clear go/no-go criteria. |
+| What differs between the three countries? | Shared core; adapters, data standards, shipping rules, training are specific; each country has a different 'first win'. |
+| Costs and ROI? | State an 8-person team estimate over 12 weeks, compared to illustrated benefits; confirm with pilot data. |
 
 ---
 
-## 14. Phụ lục: cấu trúc 10 slide
+## 14. Appendix: 10-slide structure
 
-| # | Slide | Vai trò theo đề |
+| # | Slide | Role as per the proposal |
 |---|---|---|
-| 1 | Tóm tắt điều hành | Tổng quan |
-| 2 | Vấn đề và nguyên nhân gốc | Identify |
-| 3 | Vì sao ưu tiên vấn đề này | Prioritise |
-| 4 | Kiến trúc giải pháp | Solve |
-| 5 | Tính năng cốt lõi: lời hứa có độ tin cậy | Solve |
-| 6 | AI dùng ở đâu, không dùng ở đâu | AI |
-| 7 | Phạm vi MVP, lộ trình, tiêu chí dừng | Solve |
-| 8 | Tác động kinh doanh | Business impact |
-| 9 | Nhân rộng | Scale |
-| 10 | Rủi ro, giả định, đề nghị quyết định | Kết |
+| 1 | Executive summary | Overview |
+| 2 | Issues and root causes | Identify |
+| 3 | Why prioritize this issue | Prioritise |
+| 4 | Solution architecture | Solve |
+| 5 | Core feature: Reliable promise | Solve |
+| 6 | Where AI is used, where it is not used | AI |
+| 7 | MVP scope, roadmap, stop criteria | Solve |
+| 8 | Business impact | Business impact |
+| 9 | Scale out | Scale |
+| 10 | Risk, assumption, decision proposal | Conclusion |
 
-**Đối chiếu tiêu chí chấm điểm:**
+**Scoring criteria comparison:**
 
-| Tiêu chí | Slide đáp ứng |
+| Criteria | Slide compliance |
 |---|---|
 | Problem Understanding | 2 |
 | Prioritisation & Critical Thinking | 3, 6, 10 |
 | Business Impact | 8 |
 | Feasible solution | 4, 7, 9 |
-| Structured thinking & Innovation | 5, 6 và toàn bộ mạch kể |
+| Structured thinking & Innovation | 5, 6, and the overall narrative |

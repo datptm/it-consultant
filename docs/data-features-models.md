@@ -1,213 +1,213 @@
-# Dữ liệu, feature và mô hình huấn luyện của Promise Engine PoC
+# Promise Engine PoC data, features, and trained models
 
-Tài liệu này mô tả **phần cốt lõi đang chạy** của PoC: dữ liệu đầu vào, cách biến dữ liệu thành feature và nhãn, ba mô hình huấn luyện, rồi cách dùng đầu ra để đánh giá một yêu cầu. Nguồn sự thật của PoC là [`data/sample.json`](../data/sample.json), [`features.py`](../src/promise_poc/features.py), [`ml.py`](../src/promise_poc/ml.py), [`rules.py`](../src/promise_poc/rules.py) và [`engine.py`](../src/promise_poc/engine.py). Các ý tưởng đầy đủ hơn của bài toán nằm trong [`docs/resources/methodology.md`](resources/methodology.md); những trường hoặc kỹ thuật chỉ xuất hiện ở tài liệu đó **chưa mặc nhiên được hiện thực** ở đây.
+This document describes the **working core** of the PoC: its inputs, how they become features and labels, the three trained models, and how their outputs are used to evaluate a request. The authoritative sources for this PoC are [`data/sample.json`](../data/sample.json), [`features.py`](../src/promise_poc/features.py), [`ml.py`](../src/promise_poc/ml.py), [`rules.py`](../src/promise_poc/rules.py), and [`engine.py`](../src/promise_poc/engine.py). Broader ideas are described in [`docs/resources/methodology.md`](resources/methodology.md); fields and techniques mentioned only there **are not necessarily implemented** here.
 
-## 1. Ba câu hỏi được mô hình hóa
+## 1. Three questions the models address
 
-Với một yêu cầu mua sản phẩm `p`, số lượng `q`, điểm nhận `d` và ngày mong muốn `D`, engine xét từng nguồn cung `s` và tách ba đại lượng:
+For a request for product `p`, quantity `q`, pickup location `d`, and desired date `D`, the engine evaluates each supply source `s` using three measures:
 
-| Đại lượng | Câu hỏi | Nhãn huấn luyện |
+| Measure | Question | Training label |
 |---|---|---|
-| `inventory_confidence` | Số tồn kho trong snapshot của `(p, s)` có gần số kiểm kê thực tế không? | Sai lệch không quá **1 đơn vị**. |
-| `fulfillment` | Tại `s`, đơn có được lấy đủ `q` đơn vị không? | `picked_quantity >= quantity`. |
-| `on_time` | Với tuyến từ `s` tới `d` và ngày `D`, hàng có đến không muộn hơn `D` không? | Ngày của `delivered_at <= D`, chỉ xét đơn đã lấy đủ hàng. |
+| `inventory_confidence` | Does the inventory snapshot of `(p, s)` closely match the actual count? | Deviation is no more than **1 unit**. |
+| `fulfillment` | Can all `q` units be picked at `s`? | `picked_quantity >= quantity`. |
+| `on_time` | Given the lane from `s` to `d` and date `D`, do the goods arrive by `D`? | `date(delivered_at) <= D`; only orders picked in full are considered. |
 
-`inventory_confidence` là độ tin cậy của **con số tồn kho**, không đồng nghĩa với xác suất lấy đủ một đơn. Tồn kho được dùng thêm để tạo vùng đệm và ATP; `fulfillment` trả lời một câu hỏi khác, có xét cả số lượng cần lấy. Engine tính `promise_success = fulfillment × on_time` trên các nguồn còn khả thi. Trong bộ dữ liệu huấn luyện hiện tại, mô hình giao hàng chỉ thấy các đơn đã lấy đủ hàng, nên kết quả của nó gần với `P(đúng hạn | đã lấy đủ hàng, feature giao hàng)` hơn là xác suất đúng hạn vô điều kiện. Tích hai đầu ra là một **ước lượng minh họa**, chưa được kiểm định hay hiệu chỉnh như xác suất thành công thực tế.
+`inventory_confidence` measures the reliability of **the inventory figure**, not the probability of picking an entire order. Inventory also determines a safety buffer and ATP; `fulfillment` answers a different question that includes the requested quantity. The engine calculates `promise_success = fulfillment × on_time` for feasible sources. In the current training set, the delivery model only sees orders picked in full, so its output is closer to `P(on time | picked in full, delivery features)` than an unconditional on-time probability. Multiplying the outputs gives an **illustrative estimate** that has not been validated or calibrated as an actual success probability.
 
-Hai chế độ dùng cùng dữ liệu và ràng buộc cứng:
+Two modes use the same data and hard constraints:
 
-- `rules`: các điểm và xác suất là hằng số/quy tắc dễ kiểm tra, không học từ nhãn.
-- `ml`: huấn luyện ba bộ phân loại riêng từ nhãn lịch sử; vẫn áp dụng luật kiểm tra dữ liệu, ATP, tuyến và ngày giao.
+- `rules`: scores and probabilities come from fixed, inspectable rules; they are not learned from labels.
+- `ml`: three separate classifiers are trained from historical labels; the data quality, ATP, lane, and delivery date rules still apply.
 
-## 2. Dữ liệu mẫu và ý nghĩa từng nhóm
+## 2. Sample data and the purpose of each group
 
-Tất cả bản ghi đều là **dữ liệu giả lập**. Thời gian dùng chuỗi ISO 8601 UTC có hậu tố `Z`; số lượng là đơn vị nguyên của SKU. `reference_time = 2026-11-05T10:30:00Z` giữ cho lệnh CLI chạy lại được cùng một tình huống. Bộ mẫu có 2 sản phẩm, 3 địa điểm, 4 tuyến, 11 snapshot (8 lịch sử và 3 hiện hành), 8 sự kiện, 8 lần kiểm kê, 8 đơn lịch sử và 3 yêu cầu demo.
+All records are **synthetic data**. The time uses ISO 8601 UTC string with suffix `Z`; quantity is integer units of SKU. `reference_time = 2026-11-05T10:30:00Z` ensures CLI commands run the same scenario again. The sample has 2 products, 3 locations, 4 routes, 11 snapshots (8 historical and 3 current), 8 events, 8 inventory checks, 8 historical orders, and 3 demo requests.
 
-### 2.1. Danh mục và tuyến
+### 2.1. Catalog and routes
 
-| Nhóm | Trường | Vai trò trong PoC |
+| Group | Field | Role in PoC |
 |---|---|---|
-| `products` | `product_id`, `name`, `category` | Xác nhận SKU tồn tại. `name` và `category` chỉ để mô tả; chưa đi vào feature. |
-| `locations` | `location_id`, `location_type`, `country` | Xác nhận điểm nhận, ghép nguồn với snapshot; `location_type` (`STORE`/`DC`) là feature. `country` chưa dùng để dự báo. |
-| `lanes` | `lane_id`, `source_id`, `destination_id`, `delivery_type` | Xác định một nguồn có thể phục vụ một điểm nhận theo hình thức nào. PoC chỉ dùng `STORE_PICKUP`. |
-| `lanes` | `cutoff_hour_utc`, `processing_days`, `transit_days` | Tính ngày giao sớm nhất theo giờ cutoff và số ngày làm việc. `cutoff_hour_utc` là giờ nguyên theo UTC. |
+| `products` | `product_id`, `name`, `category` | Verify SKU existence. `name` and `category` are for description only; not yet part of the feature. |
+| `locations` | `location_id`, `location_type`, `country` | Verify the pickup location and match sources with snapshots; `location_type` (`STORE`/`DC`) is a feature. `country` is not used for prediction. |
+| `lanes` | `lane_id`, `source_id`, `destination_id`, `delivery_type` | Specify which sources can serve a pickup location and by which delivery method. The PoC uses only `STORE_PICKUP`. |
+| `lanes` | `cutoff_hour_utc`, `processing_days`, `transit_days` | Calculate the earliest delivery date from the cutoff and number of business days. `cutoff_hour_utc` is an integer UTC hour. |
 
-Hai địa điểm có thể cùng giữ một SKU, nhưng chỉ được xét nếu có cả tuyến phù hợp và snapshot của SKU tại nguồn đó. Mỗi phương án chỉ lấy hàng từ **một** nguồn; `lane_id` của đơn lịch sử nối đơn với tuyến dùng khi tạo feature giao hàng.
+Two locations can share the same SKU, but only if there is a suitable route and a snapshot of the SKU at that source. Each option only picks from **one** source; the `lane_id` of the historical order connects the order to the route used when creating the delivery feature.
 
-### 2.2. Trạng thái tồn kho và các tín hiệu chất lượng
+### 2.2. Inventory status and quality signals
 
-| Nhóm | Trường | Ý nghĩa và cách dùng |
+| Group | Field | Meaning and usage |
 |---|---|---|
-| `snapshots` | `snapshot_id`, `product_id`, `location_id` | Định danh một ảnh chụp tồn kho cho một SKU tại một nguồn. `snapshot_id` cũng nối kiểm kê/đơn lịch sử tới ảnh chụp tương ứng. |
-| `snapshots` | `observed_at` | Mốc để tạo feature cho bài toán tồn kho lịch sử. Khi suy luận, chỉ chọn snapshot có `observed_at <= requested_at`. |
-| `snapshots` | `source_updated_at` | Lần cập nhật ở hệ thống nguồn; dùng tính tuổi dữ liệu `stock_age_hours`. |
-| `snapshots` | `received_at` | Lúc PoC nhận bản ghi; phải không muộn hơn thời điểm đang đánh giá. Khác với `source_updated_at`: dữ liệu có thể mới ở nguồn nhưng đến PoC muộn. |
-| `snapshots` | `last_count_at` | Thời điểm kiểm kê gần nhất do snapshot khai báo; dùng tính `days_since_last_count` và làm mốc dưới khi tìm sai lệch kiểm kê lịch sử. |
-| `snapshots` | `on_hand`, `reserved`, `allocated` | Số ghi nhận, số giữ chỗ và số đã phân bổ. Đầu vào của ATP. |
-| `snapshots` | `pending_transactions` | Số giao dịch chưa đồng bộ; là feature tồn kho/fulfillment và điều kiện trừ điểm trong rules. |
-| `snapshots` | `inbound` | Hàng đang về, có trong mẫu để thấy dữ liệu này **không được cộng vào ATP**. |
-| `events` | `event_id`, `product_id`, `location_id`, `event_type`, `quantity_delta` | Các biến động tồn kho. Hiện chỉ sự kiện `SALE` được dùng để tính tốc độ bán; `quantity_delta` âm khi bán. |
-| `events` | `event_time`, `received_at` | Thời điểm nghiệp vụ và thời điểm PoC nhận sự kiện. Cả hai điều kiện thời gian đều được kiểm tra khi tạo feature. |
-| `counts` | `snapshot_id`, `product_id`, `location_id`, `counted_at` | Kiểm kê sau snapshot để tạo nhãn; kiểm kê đã xảy ra trước mốc đánh giá mới có thể dùng làm tín hiệu lịch sử. |
-| `counts` | `system_on_hand`, `actual_on_hand` | Số hệ thống và số thực đếm. Feature sai lệch lịch sử dùng cả hai trường; **nhãn inventory** so `snapshot.on_hand` với `actual_on_hand`, không dùng `count.system_on_hand`. |
+| `snapshots` | `snapshot_id`, `product_id`, `location_id` | Identify an inventory snapshot for a SKU at a source. `snapshot_id` also links the inventory count/historical order to the corresponding snapshot. |
+| `snapshots` | `observed_at` | Reference time for historical inventory features. At inference time, only snapshots with `observed_at <= requested_at` are eligible. |
+| `snapshots` | `source_updated_at` | Last update in the source system; used to calculate data age, `stock_age_hours`. |
+| `snapshots` | `received_at` | When PoC receives a record; must not be later than the evaluation time. Unlike `source_updated_at`: data can be new at the source but arrive at PoC late. |
+| `snapshots` | `last_count_at` | Time of the most recent count recorded in the snapshot; used to calculate `days_since_last_count` and as the lower bound when looking for historical count discrepancies. |
+| `snapshots` | `on_hand`, `reserved`, `allocated` | Recorded stock, reserved stock, and allocated stock. Inputs to ATP. |
+| `snapshots` | `pending_transactions` | Unsynchronized transactions; it's a stock/fulfillment feature and a deduction condition in rules. |
+| `snapshots` | `inbound` | Items en route, data available in the sample but **not counted in ATP**. |
+| `events` | `event_id`, `product_id`, `location_id`, `event_type`, `quantity_delta` | Stock fluctuations. Currently, only `SALE` is used to calculate the sales rate; `quantity_delta` is negative when selling. |
+| `events` | `event_time`, `received_at` | Time the event occurred and time the PoC received it. Both are checked when building features. |
+| `counts` | `snapshot_id`, `product_id`, `location_id`, `counted_at` | Post-snapshot inventory check to create labels; inventory checks that occurred before the new evaluation point can be used as historical signals. |
+| `counts` | `system_on_hand`, `actual_on_hand` | System count and actual count. Historical discrepancy feature uses both fields; **inventory label** compares `snapshot.on_hand` with `actual_on_hand`, does not use `count.system_on_hand`. |
 
-Không cộng các `events` thêm lần nữa vào `on_hand`: snapshot là số tồn kho hệ thống tại mốc của nó, còn sự kiện trong PoC chỉ cung cấp tín hiệu tốc độ bán. Làm cả hai sẽ dễ đếm trùng biến động.
+Do not add `events` again to `on_hand`: snapshot is the system inventory count at its point in time, while PoC events only provide sales rate signals. Doing both can easily double-count stock fluctuations.
 
-### 2.3. Đơn lịch sử và yêu cầu cần đánh giá
+### 2.3. Historical orders and requests to evaluate
 
-| Nhóm | Trường | Ý nghĩa và cách dùng |
+| Group | Field | Meaning and usage |
 |---|---|---|
-| `orders` | `order_id`, `snapshot_id`, `lane_id` | Nối kết quả đơn hàng với ảnh chụp và tuyến đã biết lúc ra quyết định. |
-| `orders` | `requested_at`, `quantity`, `requested_delivery_date` | Thời điểm, lượng và ngày mong muốn; là feature hoặc đầu vào để tính feature. |
-| `orders` | `picked_quantity`, `picked_at` | Kết quả lấy hàng, **chỉ dùng làm nhãn** fulfillment và để chọn đơn hợp lệ cho mô hình giao hàng. |
-| `orders` | `delivered_at` | Kết quả giao hàng, **chỉ dùng làm nhãn** on-time. |
-| `demo_requests` | `request_id`, `product_id`, `quantity`, `destination_id`, `delivery_type`, `requested_at`, `requested_delivery_date` | Yêu cầu cần suy luận. Lệnh `evaluate` cho nhập các giá trị chính; nếu không truyền `--at` thì dùng `reference_time`. |
+| `orders` | `order_id`, `snapshot_id`, `lane_id` | Link an order outcome to the snapshot and lane known when the decision was made. |
+| `orders` | `requested_at`, `quantity`, `requested_delivery_date` | Request time, quantity, and desired date; features or inputs for feature calculations. |
+| `orders` | `picked_quantity`, `picked_at` | Picking outcomes, **used only as the fulfillment label** and to select eligible orders for the delivery model. |
+| `orders` | `delivered_at` | Delivery results, **only use as labels** for on-time. |
+| `demo_requests` | `request_id`, `product_id`, `quantity`, `destination_id`, `delivery_type`, `requested_at`, `requested_delivery_date` | Requests for inference. The `evaluate` command accepts the key values; without `--at`, it uses `reference_time`. |
 
-Các đơn lịch sử trong mẫu đều gắn với `SKU-001` tại `DC-001`; các yêu cầu demo có cả `SKU-002` ở cửa hàng. Vì vậy mô hình ML **chưa có bằng chứng học được cách khái quát** sang SKU/địa điểm khác. `products.category` và định danh SKU không phải feature của ba mô hình hiện tại.
+All historical orders in the sample are tied to `SKU-001` at `DC-001`; demo requirements include `SKU-002` at the store. Therefore, the ML model **has no evidence of learning to generalize** to other SKUs/locations. `products.category` and SKU identification are not features of the three current models.
 
-## 3. Quy tắc thời gian: dữ liệu nào được phép trở thành feature?
+## 3. Time rule: what data is allowed to become a feature?
 
-Gọi `t` là thời điểm đánh giá. Một feature phải được tính từ dữ liệu đã tồn tại và đã đến PoC không muộn hơn `t`; nhãn có thể xuất hiện sau `t`. Đây là ranh giới chính để tránh *data leakage*.
+Define `t` as the evaluation time. A feature must be calculated from existing data that has reached PoC no later than `t`; labels can appear after `t`. This is the main boundary to avoid *data leakage*.
 
-1. **Chọn snapshot khi suy luận:** với mỗi `(product_id, source_id)`, chọn snapshot mới nhất theo `observed_at` trong các bản có `observed_at <= t` và `received_at <= t`. Không có snapshot phù hợp thì bỏ nguồn.
-2. **Kiểm tra bản thân snapshot:** `source_updated_at`, `last_count_at` và `received_at` đều phải `<= t`; nếu không, tạo feature báo lỗi. Engine còn bỏ nguồn nếu `stock_age_hours > 24`.
-3. **Sự kiện bán:** chỉ cộng `SALE` của đúng sản phẩm/nguồn, có `event_time` nằm trong cửa sổ 7 ngày ngay trước `t` và `received_at <= t`. Một giao dịch xảy ra trước `t` nhưng đến sau `t` không được dùng để giải thích quyết định quá khứ.
-4. **Kiểm kê lịch sử:** chỉ xét kiểm kê của đúng sản phẩm/nguồn với `last_count_at <= counted_at <= t`; chọn bản có `counted_at` mới nhất. Không có bản hợp lệ thì feature sai lệch lịch sử là `0` trong PoC. Giá trị `0` này có nghĩa **không có tín hiệu sai lệch đã biết**, không chứng minh dữ liệu thật sự chính xác. Mẫu không có `received_at` cho kiểm kê, nên mã đang xem `counted_at` là thời điểm kết quả đã biết; dữ liệu thật cần tách hai mốc này.
-5. **Huấn luyện inventory:** feature lấy tại `snapshot.observed_at`; kiểm kê được nối bằng `snapshot_id` và bắt buộc `counted_at > observed_at`, rồi mới tạo nhãn.
-6. **Huấn luyện fulfillment/delivery:** feature lấy tại `order.requested_at`; snapshot liên quan phải có `received_at <= requested_at`. `picked_at` phải sau `requested_at`; `delivered_at` phải sau `requested_at` đối với hàng đưa vào mô hình giao hàng.
+1. **Select snapshot when inferring:** for each `(product_id, source_id)`, select the latest snapshot according to `observed_at` among those with `observed_at <= t` and `received_at <= t`. If no suitable snapshot exists, discard the source.
+2. **Self-check snapshot:** `source_updated_at`, `last_count_at`, and `received_at` must all be `<= t`; if not, create a feature error. The engine discards the source if `stock_age_hours > 24`.
+3. **Sales events:** include only `SALE` events for the matching product and source, with `event_time` in the seven days immediately before `t` and `received_at <= t`. A transaction that occurred before `t` but arrived after `t` cannot explain a past decision.
+4. **Historical counts:** consider only counts for the matching product and source with `last_count_at <= counted_at <= t`; choose the latest `counted_at`. If none is eligible, the historical discrepancy feature is `0` in this PoC. A value of `0` means **no known discrepancy signal**, not proof that the data is accurate. The sample has no `received_at` for counts, so the code treats `counted_at` as the time the result became known; real data would need separate timestamps.
+5. **Inventory training:** feature taken at `snapshot.observed_at`; inventory count connected by `snapshot_id` and required `counted_at > observed_at`, then create label.
+6. **Fulfillment/delivery training:** feature taken at `order.requested_at`; related snapshot must have `received_at <= requested_at`. `picked_at` must come after `requested_at`; `delivered_at` must come after `requested_at` for delivery items in the delivery model.
 
-Các kiểm tra trên bảo vệ feature khỏi một số trường hợp dùng tương lai. Đây là bộ dữ liệu minh họa, chưa có hệ thống lưu snapshot bất biến hay đối soát biến động giữa lúc snapshot và lúc kiểm kê. Vì thế một nhãn tồn kho dựa trên kiểm kê muộn vẫn có thể bị ảnh hưởng bởi giao dịch phát sinh trong khoảng giữa nếu áp dụng nguyên xi cho dữ liệu thật.
+These checks prevent some forms of future data from entering features. This is an illustrative dataset: there is no immutable snapshot store or reconciliation of transactions between a snapshot and its count. A label derived from a later count could therefore be affected by intervening transactions if the same method were applied unchanged to real data.
 
-## 4. Feature của từng mô hình
+## 4. Features of each model
 
 ### 4.1. Inventory Confidence
 
-Một hàng feature tương ứng với **một snapshot của một SKU tại một nguồn, nhìn tại thời điểm `t`**.
+A feature row corresponds to **a snapshot of a SKU at a source, viewed at the moment `t`**.
 
-| Feature | Kiểu/đơn vị | Công thức hoặc nguồn | Ý nghĩa |
+| Feature | Type/Unit | Formula or source | Meaning |
 |---|---|---|---|
-| `stock_age_hours` | Số thực, giờ | `(t - source_updated_at) / 1 giờ` | Dữ liệu nguồn cũ bao lâu. |
-| `days_since_last_count` | Số thực, ngày | `(t - last_count_at) / 1 ngày` | Đã lâu chưa kiểm kê; có thể là số lẻ. |
-| `sales_velocity_7d` | Số thực, đơn vị/ngày | Tổng `abs(quantity_delta)` của các `SALE` hợp lệ trong 7 ngày, chia `7` | Tốc độ bán quan sát được trong một cửa sổ cố định. |
-| `historical_discrepancy` | Số thực, tỷ lệ | Với kiểm kê hợp lệ mới nhất: `abs(system_on_hand - actual_on_hand) / max(actual_on_hand, 1)`; thiếu bản ghi thì `0` | Độ lệch kiểm kê đã biết. |
-| `pending_transactions` | Số nguyên | `snapshot.pending_transactions` | Tín hiệu giao dịch chưa đồng bộ. |
-| `on_hand` | Số nguyên, đơn vị | `snapshot.on_hand` | Quy mô số tồn kho hệ thống. |
-| `location_type` | Chuỗi phân loại | `STORE` hoặc `DC` từ `locations` | Loại nguồn cung. |
+| `stock_age_hours` | Real number, hours | `(t - source_updated_at) / 1 hour` | Age of the source data. |
+| `days_since_last_count` | Real number, days | `(t - last_count_at) / 1 day` | Time since the last count; it can be fractional. |
+| `sales_velocity_7d` | Real number, units/day | Total `abs(quantity_delta)` for eligible `SALE` events in seven days, divided by `7` | Observed sales rate over a fixed window. |
+| `historical_discrepancy` | Real number, ratio | With the latest valid inventory: `abs(system_on_hand - actual_on_hand) / max(actual_on_hand, 1)`; missing record then `0` | Known inventory deviation. |
+| `pending_transactions` | Integer | `snapshot.pending_transactions` | Out-of-sync transaction signal. |
+| `on_hand` | Integer, unit | `snapshot.on_hand` | System inventory scale. |
+| `location_type` | Categorical string | `STORE` or `DC` from `locations` | Type of supply source. |
 
-`stock_age_hours` và `days_since_last_count` được tính từ thời điểm đang đánh giá, không từ đồng hồ lúc chạy lệnh CLI. `sales_velocity_7d` là tổng số bán/7 ngay cả khi trong 7 ngày chỉ có một sự kiện. Chưa có feature 30 ngày, tỷ lệ điều chỉnh tồn kho, mức độ tin cậy của inbound hoặc mã nhóm sản phẩm dù tài liệu phương pháp có đề xuất.
+`stock_age_hours` and `days_since_last_count` are calculated from the evaluation time, not the CLI's wall clock. `sales_velocity_7d` is total units sold divided by seven even if only one sale occurred in the seven-day window. There are no 30-day features, inventory adjustment rates, inbound reliability measures, or product group codes, although the methodology proposes them.
 
 ### 4.2. Fulfillment
 
-Một hàng feature tương ứng với **một đơn tại một nguồn ở thời điểm yêu cầu**.
+One feature corresponds to **one order at a source at the request time**.
 
-| Feature | Kiểu/đơn vị | Công thức hoặc nguồn | Ý nghĩa |
+| Feature | Type/Unit | Formula or source | Meaning |
 |---|---|---|---|
-| `requested_quantity` | Số nguyên, đơn vị | `order.quantity` hoặc lượng yêu cầu mới | Lượng cần lấy đủ. |
-| `raw_available` | Số nguyên, đơn vị | `on_hand - reserved - allocated` | Số có thể xét trước khi áp dụng safety buffer. **Không phải ATP.** |
-| `pending_transactions` | Số nguyên | Snapshot đang xét | Rủi ro dữ liệu chưa đồng bộ. |
-| `stock_age_hours` | Số thực, giờ | Cùng phép tính với Inventory Confidence | Độ mới của dữ liệu nguồn. |
-| `location_type` | Chuỗi phân loại | Loại nguồn từ `locations` | Phân biệt cửa hàng và DC nếu có dữ liệu học. |
+| `requested_quantity` | Integer, units | `order.quantity` or the new request quantity | Quantity that must be picked in full. |
+| `raw_available` | Integer, unit | `on_hand - reserved - allocated` | Number to consider before applying safety buffer. **Not ATP.** |
+| `pending_transactions` | Integer | The current snapshot | Risk from unsynchronized data. |
+| `stock_age_hours` | Real number, hour | Same calculation as Inventory Confidence | Source data freshness. |
+| `location_type` | Categorical string | Source type from `locations` | Distinguishes stores from DCs if the training data permits. |
 
-Mô hình fulfillment **không** nhận trực tiếp `inventory_confidence` hay `effective_atp` làm feature. Cách này tránh việc tạo feature huấn luyện bằng dự đoán *in-sample* của mô hình inventory rồi dùng một định nghĩa khác lúc suy luận. Engine vẫn áp dụng ATP như ràng buộc cứng trước khi tin đầu ra fulfillment.
+The fulfillment model **does not** use `inventory_confidence` or `effective_atp` directly as features. This avoids building training features from *in-sample* predictions by the inventory model and then using a different definition at inference time. The engine still enforces ATP as a hard constraint before using the fulfillment output.
 
 ### 4.3. On-time Delivery
 
-Một hàng feature tương ứng với **một tuyến, một lượng hàng và một ngày được đề nghị tại thời điểm yêu cầu**.
+A feature row represents **one lane, quantity, and proposed delivery date at request time**.
 
-| Feature | Kiểu/đơn vị | Công thức hoặc nguồn | Ý nghĩa |
+| Feature | Type/Unit | Formula or source | Meaning |
 |---|---|---|---|
-| `quantity` | Số nguyên, đơn vị | Lượng yêu cầu | Quy mô đơn. |
-| `lead_days` | Số nguyên, ngày lịch | `requested_delivery_date - date(requested_at)` | Số ngày khách cho phép từ lúc đặt tới ngày mong muốn. |
-| `slack_days` | Số nguyên, ngày lịch | `requested_delivery_date - earliest_delivery_date` | Dư địa sau ngày sớm nhất do quy tắc tuyến tính được. |
-| `delivery_type` | Chuỗi phân loại | `lane.delivery_type` | Hình thức nhận; mẫu hiện chỉ có `STORE_PICKUP`. |
-| `source_type` | Chuỗi phân loại | Loại địa điểm xuất hàng | `STORE` hoặc `DC`. |
+| `quantity` | Integer, units | Requested quantity | Order size. |
+| `lead_days` | Integer, calendar days | `requested_delivery_date - date(requested_at)` | Days allowed between order placement and the desired date. |
+| `slack_days` | Integer, calendar days | `requested_delivery_date - earliest_delivery_date` | Time beyond the earliest date calculated by lane rules. |
+| `delivery_type` | Classification string | `lane.delivery_type` | Receipt form; current sample only `STORE_PICKUP` |
+| `source_type` | Categorical string | Type of shipping location | `STORE` or `DC`. |
 
-Ngày sớm nhất được tính **trước** khi dự đoán: nếu đặt vào cuối tuần hoặc từ giờ cutoff trở đi thì bắt đầu ngày làm việc kế tiếp; sau đó cộng `processing_days + transit_days`, mỗi bước bỏ qua thứ Bảy và Chủ nhật. PoC dùng UTC và không có lịch ngày lễ. `lead_days` và `slack_days` là chênh lệch **ngày lịch**, còn processing/transit là **ngày làm việc**. Chưa dùng carrier, khoảng cách, tải kho, thời tiết hay lịch sử trễ của tuyến.
+The earliest delivery date is calculated **before** prediction: if an order is placed on a weekend or at or after the cutoff, the calculation starts on the next business day; it then adds `processing_days + transit_days`, skipping Saturday and Sunday at each step. The PoC uses UTC and has no holiday calendar. `lead_days` and `slack_days` are differences in **calendar days**, whereas processing and transit use **business days**. Carrier, distance, warehouse load, weather, and historical lane delays are not yet used.
 
-## 5. Cách tạo nhãn và tập huấn luyện
+## 5. Creating labels and training sets
 
-| Mô hình | Một hàng bắt đầu từ | Nhãn `1` | Nhãn `0` | Số hàng mẫu |
+| Model | A row starts from | Label `1` | Label `0` | Sample count |
 |---|---|---|---|---|
-| Inventory | Một `count` nối tới snapshot bằng `snapshot_id` | `abs(snapshot.on_hand - count.actual_on_hand) <= 1` | Sai lệch lớn hơn 1 | 8: **4/4** |
-| Fulfillment | Một `order` nối tới snapshot bằng `snapshot_id` | `picked_quantity >= quantity` | Lấy thiếu | 8: **6/2** |
-| Delivery | Một `order` đã lấy đủ, nối tới snapshot và lane | `date(delivered_at) <= requested_delivery_date` | Giao sau ngày mong muốn | 6: **3/3** |
+| Inventory | A `count` connected to snapshot via `snapshot_id` | `abs(snapshot.on_hand - count.actual_on_hand) <= 1` | Large deviation greater than 1 | 8: **4/4** |
+| Fulfillment | An `order` linked to a snapshot by `snapshot_id` | `picked_quantity >= quantity` | Picked too few items | 8: **6/2** |
+| Delivery | An `order` picked in full and linked to a snapshot and lane | `date(delivered_at) <= requested_delivery_date` | Delivered after the desired date | 6: **3/3** |
 
-Tỷ lệ `4/4`, `6/2`, `3/3` lần lượt là số nhãn `1`/`0`, **không phải** tỷ lệ thực tế của nghiệp vụ. Hai đơn lấy thiếu bị loại khỏi tập Delivery; chúng vẫn có nhãn fulfillment `0`. PoC so **ngày** giao, không so giờ trong ngày. Tolerance tồn kho là hằng số **1 đơn vị**, chưa cấu hình theo loại hàng hoặc lượng tồn. Mã không phân biệt đơn hủy do khách, lỗi vận tải, đổi ngày hứa hay kiểm kê chưa xác minh vì dữ liệu mẫu chưa có các trạng thái đó.
+The ratios `4/4`, `6/2`, and `3/3` are counts of labels `1`/`0`, **not** real business success rates. The two orders with insufficient picks are excluded from the Delivery set, but retain fulfillment label `0`. The PoC compares the **delivery date**, not the time within that day. Inventory tolerance is fixed at **1 unit**, with no configuration by item type or stock level. The code cannot distinguish customer cancellations, carrier failures, changes to promised dates, or unverified counts because the sample lacks those statuses.
 
-Để thấy sự khác biệt giữa feature và nhãn: với `H1`, snapshot ghi `on_hand = 20` lúc 10:00, kiểm kê lúc 12:00 thấy `actual_on_hand = 20`, nên nhãn inventory là `1`. Feature của `H1` được dựng ở **10:00**; giá trị thực đếm lúc 12:00 không có mặt trong từ điển feature. Với `H2`, snapshot ghi `20` và sau đó đếm được `13`, sai lệch `7 > 1`, nên nhãn là `0`.
+To see the difference between feature and label: with `H1`, the snapshot records `on_hand = 20` at 10:00, the stock count at 12:00 shows `actual_on_hand = 20`, so the inventory label is `1`. The feature of `H1` is built at **10:00**; the actual count value at 12:00 is not present in the feature dictionary. With `H2`, the snapshot records `20` and then the count shows `13`, with a discrepancy of `7 > 1`, so the label is `0`.
 
-## 6. Huấn luyện ML hiện tại
+## 6. Current ML Training
 
-[`train_models`](../src/promise_poc/ml.py) thực hiện cùng một quy trình cho `inventory`, `fulfillment`, `delivery`:
+[`train_models`](../src/promise_poc/ml.py) performs the same process for `inventory`, `fulfillment`, `delivery`:
 
-1. Gọi `build_training_rows(data, kind)` để nhận danh sách `(feature_dict, nhãn 0/1)` theo định nghĩa ở trên.
-2. Từ chối huấn luyện nếu tập của mô hình không có đủ **cả hai lớp** nhãn.
-3. Tạo pipeline `DictVectorizer()` → `LogisticRegression(C=1, max_iter=1000)` theo mặc định của CLI; giao diện web có thể đổi `C` và `max_iter`. `DictVectorizer` giữ feature số và mã hóa các chuỗi phân loại thành cột chỉ báo; Logistic Regression học trọng số cho xác suất lớp `1`.
-4. `fit` trên **toàn bộ** các hàng của mô hình đó. Khi suy luận, gọi `predict_proba` và lấy đúng cột có nhãn lớp `1`.
+1. Call `build_training_rows(data, kind)` to receive the list `(feature_dict, label 0/1)` as defined above.
+2. Refuse to train if the model's dataset does not contain **both label classes**.
+3. By default, create a `DictVectorizer()` → `LogisticRegression(C=1, max_iter=1000)` pipeline for the CLI; the web interface can change `C` and `max_iter`. `DictVectorizer` retains numeric features and turns categorical strings into indicator columns; logistic regression learns weights to estimate the probability of class `1`.
+4. `fit` on **all** rows for that model. At inference time, call `predict_proba` and take the column for class `1`.
 
-Mỗi lần dùng CLI `--mode ml`, cả ba pipeline được huấn luyện mới **trong bộ nhớ** từ `data/sample.json`; CLI không dùng file mô hình, registry hoặc bước học tăng dần. Mặc định `C=1`, `max_iter=1000`; các tham số khác dùng mặc định của phiên bản scikit-learn đã cài. PoC không có chuẩn hóa thang số, xử lý giá trị thiếu, cân bằng lớp, chọn siêu tham số, chia tập theo thời gian, validation/test độc lập hay hiệu chỉnh xác suất. Vì vậy các con số như `0.82` hoặc `0.99` từ `predict_proba` **không thể được diễn giải** là tần suất thành công đã được chứng minh.
+Each time CLI `--mode ml` is used, all three pipelines are retrained **in memory** from `data/sample.json`; CLI does not use model files, registry, or incremental learning steps. Default `C=1`, `max_iter=1000`; other parameters use defaults from the installed scikit-learn version. PoC does not include numerical scaling, handling missing values, class balancing, hyperparameter selection, time-based data splitting, independent validation/test sets, or probability calibration. Therefore, numbers like `0.82` or `0.99` from `predict_proba` **cannot be interpreted** as proven success rates.
 
-Giao diện Streamlit ở `ui/app.py` tách huấn luyện khỏi đánh giá ML: tab **ML training** cho chỉnh `C` (0,01–100) và `max_iter` (100–5000) dùng chung cho cả ba pipeline, huấn luyện trên đúng bộ mẫu này rồi lưu một bundle `skops` ở `ui/.local/latest.skops`. Tab đánh giá chỉ tải bundle đã lưu, không tự huấn luyện; nếu chưa có hoặc bundle không tương thích với phiên bản scikit-learn hay nội dung dữ liệu mẫu, người dùng phải huấn luyện lại. CLI vẫn giữ mặc định `C=1`, `max_iter=1000` và tự huấn luyện mỗi lần gọi. Bundle chỉ phục vụ demo cục bộ, không phải model registry hoặc bằng chứng chất lượng mô hình.
+Streamlit interface at `ui/app.py` separates training from ML evaluation: the **ML training** tab adjusts `C` (0.01–100) and `max_iter` (100–5000) shared across all three pipelines, trains on this exact dataset, and saves a bundle `skops` at `ui/.local/latest.skops`. The evaluation tab only loads the saved bundle and does not retrain; if the bundle is missing or incompatible with the scikit-learn version or the sample data content, the user must retrain. CLI defaults to `C=1`, `max_iter=1000`, and retraining each call. The bundle is only for local demo purposes and not a model registry or model quality evidence.
 
-Trong tập huấn luyện mẫu, các đơn và kiểm kê đều thuộc DC/SKU đầu tiên; khi áp dụng mô hình cho cửa hàng hoặc SKU khác, bộ mã hóa có thể gặp giá trị phân loại chưa thấy và Logistic Regression phải ngoại suy. Không dùng kết quả này để đánh giá hiệu quả mô hình hay đưa ra cam kết thương mại.
+In the sample training data, all units and counts belong to the first DC/SKU; when applying the model to a different store or SKU, the encoding may encounter unseen classification values and Logistic Regression must extrapolate. Do not use this result to evaluate model effectiveness or make commercial commitments.
 
-## 7. Từ feature tới quyết định: rules và ML khác nhau ở đâu?
+## 7. From feature to decision: where do rules and ML differ?
 
-### 7.1. Điểm rule và ATP chung
+### 7.1. Rule scores and shared ATP calculation
 
-Chế độ rules bắt đầu `inventory_confidence = 1,00`, rồi trừ các khoản sau. Điều kiện `>` là **nghiêm ngặt**, bằng ngưỡng thì chưa bị trừ.
+Rules mode begins with `inventory_confidence = 1,00` and subtracts the following penalties. A `>` comparison is **strict**: equality does not trigger a penalty.
 
-| Điều kiện | Điểm trừ |
+| Condition | Points deducted |
 |---|---:|
 | `days_since_last_count > 30` | 0,15 |
 | `pending_transactions > 0` | 0,20 |
 | `historical_discrepancy > 0,10` | 0,20 |
-| `sales_velocity_7d > 5` đơn vị/ngày | 0,10 |
+| `sales_velocity_7d > 5` units/day | 0,10 |
 | `stock_age_hours > 24` | 0,15 |
 
-Điểm cuối được chặn dưới ở `0`. Riêng `stock_age_hours > 24` còn là **điều kiện loại nguồn** trong engine, kể cả khi điểm sau trừ vẫn nằm ở dải `HIGH`. Hai chế độ đều dùng xác suất inventory của mình để tính:
+The final score has a lower bound of `0`. Separately, `stock_age_hours > 24` is a **source exclusion condition** in the engine, even if the score would otherwise remain in the `HIGH` band. Both modes use their own inventory confidence value to calculate:
 
 ```text
 safety_buffer = ceil(on_hand × (1 − inventory_confidence) × 0,5)
 ATP = max(0, on_hand − reserved − allocated − safety_buffer)
 ```
 
-Hàng `inbound` không tham gia công thức. `ceil` làm tròn vùng đệm lên số nguyên, khiến ATP thận trọng hơn khi điểm tin cậy thấp. Sau đó engine loại nguồn nếu `ATP < requested_quantity` hoặc ngày yêu cầu sớm hơn ngày tuyến có thể giao. Mô hình ML **không được phép vượt qua** các điều kiện loại này.
+`inbound` is excluded from the formula. `ceil` rounds the safety buffer up to an integer, making ATP more conservative when confidence is low. The engine then excludes a source if `ATP < requested_quantity` or the requested date precedes the lane's earliest delivery date. The ML model **cannot override** either exclusion.
 
-### 7.2. Ba đầu ra ở hai chế độ
+### 7.2. Three outputs in two modes
 
-| Đầu ra | `rules` | `ml` |
+| Output | `rules` | `ml` |
 |---|---|---|
-| Inventory | Điểm trừ ở bảng trên. | Xác suất lớp `1` của mô hình Inventory từ 7 feature ở mục 4.1. |
-| Fulfillment | Nếu ATP thiếu: nguồn bị loại. Nếu đủ và dư ít nhất 2 đơn vị: `0,99`; nếu đủ nhưng dư dưới 2: `0,90`. | Xác suất lớp `1` của mô hình Fulfillment từ 5 feature ở mục 4.2, sau khi qua cổng ATP. |
-| On-time | Nếu ngày mong muốn sau ngày sớm nhất: `0,99`; nếu đúng ngày sớm nhất: `0,96`. Ngày quá sớm bị loại. | Xác suất lớp `1` của mô hình Delivery từ 5 feature ở mục 4.3, sau khi qua cổng ngày giao. |
+| Inventory | Penalty in the table above. | Probability of class `1` for the Inventory model from 7 features in section 4.1. |
+| Fulfillment | If ATP is deficient: source is eliminated. If sufficient and has at least 2 units surplus: `0,99`; if sufficient but has less than 2 units surplus: `0,90`. | Probability of class `1` for the Fulfillment model from 5 features in section 4.2, after passing through the ATP gate. |
+| On-time | If the desired date is after the earliest date: `0,99`; if it matches the earliest date: `0,96`. Early dates are eliminated. | Probability of class `1` for the Delivery model from 5 features in section 4.3, after passing through the delivery date gate. |
 
-Những giá trị cố định `0,90`, `0,96` và `0,99` của rules là **tham số minh họa**, chưa được ước lượng từ tỷ lệ thành công thực tế. Engine nhân hai đầu ra Fulfillment và On-time **trước khi làm tròn**; JSON chỉ làm tròn mỗi xác suất đến bốn chữ số thập phân.
+The fixed rules values `0,90`, `0,96`, and `0,99` are **illustrative parameters**, not estimates from actual success rates. The engine multiplies the Fulfillment and On-time outputs **before rounding**; JSON rounds each probability to four decimal places.
 
-### 7.3. Ngưỡng và chọn nguồn
+### 7.3. Thresholds and source selection
 
-| Điều kiện sau khi nguồn qua ATP/ngày giao | Quyết định |
+| Conditions after the source passes through ATP/delivery date | Decision |
 |---|---|
-| `inventory_confidence < 0,65` **hoặc** `promise_success < 0,85` | `REJECT` |
-| `inventory_confidence >= 0,85` **và** `promise_success >= 0,95` | `PROMISE` |
-| Các trường hợp còn lại | `VERIFY` |
+| `inventory_confidence < 0,65` **or** `promise_success < 0,85` | `REJECT` |
+| `inventory_confidence >= 0,85` **and** `promise_success >= 0,95` | `PROMISE` |
+| The remaining cases | `VERIFY` |
 
-Các dải inventory dùng trong `reasons` là `HIGH` từ `0,85`, `MEDIUM` từ `0,65` đến dưới `0,85`, `LOW` dưới `0,65`. Khi có nhiều nguồn, engine ưu tiên quyết định `PROMISE` hơn `VERIFY` hơn `REJECT`; trong cùng mức ưu tiên, so xác suất thành công, confidence, ngày giao sớm hơn rồi `source_id` theo thứ tự từ điển giảm dần. Vì vậy nguồn được chọn không nhất thiết chỉ là nguồn có xác suất lớn nhất nếu mức quyết định khác nhau. Không có nguồn khả thi thì kết quả là `REJECT` với `NO_FEASIBLE_SINGLE_SOURCE`; ngày hứa chỉ xuất hiện khi quyết định là `PROMISE`.
+The inventory ranges used in `reasons` are `HIGH` from `0,85`, `MEDIUM` from `0,65` to below `0,85`, `LOW` below `0,65`. When there are multiple sources, the engine prioritizes deciding `PROMISE` over `VERIFY` over `REJECT`; at the same priority level, it compares success probability, confidence, earliest date first, then `source_id` in descending lexicographical order. Therefore, the selected source is not necessarily the one with the highest probability if the decision level differs. If there are no feasible sources, the result is `REJECT` with `NO_FEASIBLE_SINGLE_SOURCE`; the promised date only appears when the decision is `PROMISE`.
 
-## 8. Một ca tính tay trên dữ liệu mẫu
+## 8. A manual case on sample data
 
-`REQ-001` yêu cầu **2** `SKU-001` nhận tại `STORE-001`, đặt lúc `2026-11-05T10:30:00Z`, mong muốn ngày `2026-11-10`. Tuyến `DC-S1` cho phép xuất từ `DC-001`, cutoff 16:00 UTC, xử lý 1 ngày làm việc và vận chuyển 1 ngày làm việc.
+`REQ-001` requests **2** units of `SKU-001` for pickup at `STORE-001`, placed at `2026-11-05T10:30:00Z`, with a desired date of `2026-11-10`. Lane `DC-S1` can ship from `DC-001`; its cutoff is 16:00 UTC, processing takes one business day, and transit takes one business day.
 
-1. Snapshot `LIVE-DC` lúc 10:00 có `on_hand = 100`, `reserved = 10`, `allocated = 0`, `pending_transactions = 0`, `source_updated_at = 09:00`. Tại 10:30: `stock_age_hours = 1,5`, `days_since_last_count ≈ 1,0208`, `sales_velocity_7d = 0`, `historical_discrepancy = 0` trong cửa sổ đang xét. Không điều kiện trừ điểm nào áp dụng, nên confidence rules là `1,00`.
-2. `safety_buffer = ceil(100 × (1 − 1,00) × 0,5) = 0`; `ATP = 100 − 10 − 0 − 0 = 90`, đủ 2 đơn vị. `inbound = 20` trong snapshot không làm ATP tăng.
-3. Đặt trước cutoff vào thứ Năm 05/11; cộng 2 ngày làm việc thành thứ Hai **09/11**. Ngày mong muốn 10/11 muộn hơn ngày sớm nhất, nên `on_time` rules là `0,99`. ATP dư ít nhất 2 đơn vị, nên `fulfillment` rules là `0,99`.
-4. `promise_success = 0,99 × 0,99 = 0,9801`. Confidence `1,00 >= 0,85` và success `0,9801 >= 0,95`, nên kết quả rules là `PROMISE`, nguồn `DC-001`, ngày hứa `2026-11-10`.
+1. Snapshot `LIVE-DC` at 10:00 has `on_hand = 100`, `reserved = 10`, `allocated = 0`, `pending_transactions = 0`, `source_updated_at = 09:00`. At 10:30: `stock_age_hours = 1,5`, `days_since_last_count ≈ 1,0208`, `sales_velocity_7d = 0`, `historical_discrepancy = 0` within the current window. With no penalty conditions applied, the confidence rules are `1,00`.
+2. `safety_buffer = ceil(100 × (1 − 1,00) × 0,5) = 0`; `ATP = 100 − 10 − 0 − 0 = 90`, sufficient for 2 units. `inbound = 20` in the snapshot does not increase ATP.
+3. Placed before the cutoff on Thursday 05/11; two business days later is Monday **09/11**. The desired date 10/11 is later than the earliest date, so rules mode assigns `on_time = 0,99`. ATP exceeds the request by at least two units, so rules mode assigns `fulfillment = 0,99`.
+4. `promise_success = 0,99 × 0,99 = 0,9801`. Confidence `1,00 >= 0,85` and success `0,9801 >= 0,95`, so the result rules are `PROMISE`, source `DC-001`, promised date `2026-11-10`.
 
-Chế độ ML dùng **cùng snapshot, tuyến, yêu cầu và cổng ATP/ngày giao**, nhưng thay ba con số do rules tạo bằng ba dự đoán từ mô hình. Dữ liệu ít khiến quyết định ML có thể khác rules, kể cả `REJECT` cho ca trên; đây là dấu hiệu giới hạn của bộ mẫu, không phải bằng chứng ML an toàn hơn.
+ML mode uses **the same snapshot, lane, request, and ATP/date gates**, but replaces the three rules-based values with model predictions. Limited data can make the ML decision differ from rules, including a `REJECT` for this example; that reflects the sample's limitations, not evidence that ML is safer.
 
-## 9. Cách tái hiện và giới hạn diễn giải
+## 9. How to reproduce and interpret limitations
 
-Sau khi cài theo [`README.md`](../README.md), chạy từ thư mục gốc:
+After installing [`README.md`](../README.md), run from the root directory:
 
 ```powershell
 python -m promise_poc demo --mode rules
@@ -215,4 +215,4 @@ python -m promise_poc demo --mode ml
 python -m promise_poc evaluate --product-id SKU-001 --quantity 2 --destination-id STORE-001 --date 2026-11-10 --mode ml
 ```
 
-Các lệnh `demo` trả về ba yêu cầu để thấy nguồn đủ hàng, thiếu hàng và một SKU khác. CLI không ghi phản hồi hay huấn luyện lại sau quyết định; lần chạy ML sau vẫn học từ cùng 8 đơn/kiểm kê mẫu. Muốn đánh giá xác suất một cách nghiêm túc cần dữ liệu lịch sử đủ lớn và đáng tin, chia train/validation/test theo thời gian, kiểm tra sai lệch theo SKU/nguồn/tuyến, và đo calibration như Brier score trên tập chưa dùng để huấn luyện. Những bước đó **chưa nằm trong PoC hiện tại**.
+The `demo` commands return three requests that illustrate sufficient stock, a shortage, and another SKU. The CLI does not record feedback or retrain after a decision; a later ML run still learns from the same eight sample orders and counts. A serious probability evaluation requires enough reliable historical data, time-based train/validation/test splits, error analysis by SKU/source/lane, and calibration measures such as Brier score on held-out data. These steps **are not part of the current PoC**.

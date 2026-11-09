@@ -1,68 +1,68 @@
 # Promise Engine – Technical Design & Implementation Specification
 
-**Phiên bản:** 1.0  
-**Phạm vi:** MVP 12 tuần  
-**Mô hình tiếp cận:** Hybrid Rules + Machine Learning + Optimization  
-**Kiến trúc triển khai:** Read-only integration với ERP / POS / WMS trong giai đoạn MVP
+**Version:** 1.0<br>
+**Scope:** MVP 12 weeks<br>
+**Approach Model:** Hybrid Rules + Machine Learning + Optimization<br>
+**Deployment Architecture:** Read-only integration with ERP / POS / WMS during MVP phase
 
 ---
 
-## 1. Mục tiêu và phạm vi
+## 1. Objectives and Scope
 
-### 1.1. Mục tiêu
+### 1.1. Objectives
 
-Promise Engine là thành phần tính toán khả năng cam kết cung cấp sản phẩm cho khách hàng tại một địa điểm và thời điểm cụ thể.
+The Promise Engine calculates whether a product commitment to a customer can be met at a given location and time.
 
-Đầu vào gồm:
+Inputs include:
 
-- Sản phẩm và số lượng khách hàng yêu cầu.
-- Địa điểm nhận hàng hoặc giao hàng.
-- Thời điểm khách hàng mong muốn nhận hàng.
-- Tình trạng tồn kho từ các hệ thống nguồn.
-- Khả năng xử lý đơn hàng và năng lực giao vận.
+- Products and customer quantities required.
+- Delivery location or pickup location.
+- The customer's desired delivery date.
+- Inventory status from source systems.
+- Order processing capacity and transportation capability.
 
-Đầu ra gồm:
+Outputs include:
 
-- Số lượng có thể cam kết.
-- Địa điểm có thể đáp ứng.
-- Ngày giao hoặc ngày nhận dự kiến.
-- Xác suất thực hiện cam kết thành công.
-- Mức độ tin cậy của kết quả.
-- Lý do và các yếu tố ảnh hưởng đến quyết định.
+- Quantity that can be promised.
+- Locations able to fulfill the request.
+- Expected delivery or pickup date.
+- Probability that the promise will be kept.
+- Confidence level of the result.
+- Reasons and factors influencing the decision.
 
-### 1.2. Nguyên tắc thiết kế
+### 1.2. Design principles
 
-Promise Engine không nên sử dụng một chỉ số duy nhất để quyết định có thể cam kết hay không.
+The Promise Engine should not use a single metric to determine whether a commitment is possible.
 
-Thay vào đó, cần tách biệt ba nhóm xác suất:
+It therefore evaluates three separate probability groups:
 
-| Thành phần | Ý nghĩa | Câu hỏi cần trả lời |
+| Components | Meaning | Question to be answered |
 |---|---|---|
-| Inventory Confidence | Độ tin cậy của số liệu tồn kho | Số tồn kho hiện tại có đáng tin không? |
-| Fulfillment Probability | Xác suất đáp ứng đủ số lượng | Có thể lấy đủ hàng để thực hiện đơn không? |
-| On-time Delivery Probability | Xác suất giao đúng hạn | Hàng có thể đến đúng ngày đã hứa không? |
+| Inventory Confidence | Reliability of inventory data | Is the current inventory reliable? |
+| Fulfillment Probability | Probability of meeting demand | Can we fulfill the order without shortage? |
+| On-time Delivery Probability | On-time delivery probability | Can inventory arrive by the promised date? |
 
-Kết quả cuối cùng là xác suất thực hiện thành công toàn bộ lời hứa.
+The final result estimates the probability of keeping the whole promise.
 
-### 1.3. Phạm vi MVP
+### 1.3. MVP Scope
 
-MVP tập trung vào:
+MVP focuses on:
 
-- Một quốc gia thí điểm.
-- Khoảng 15 cửa hàng và 1 Distribution Center.
-- Một tập SKU được lựa chọn.
-- Dữ liệu đọc từ ERP, POS và WMS.
-- Tính toán khả năng đáp ứng theo tồn kho và quy tắc vận hành.
-- Dự báo ngày giao dựa trên lịch sử giao hàng.
-- Ghi nhận kết quả thực tế để phục vụ huấn luyện mô hình.
+- A pilot country.
+- Approximately 15 stores and 1 Distribution Center.
+- A selected set of SKUs.
+- Data read from ERP, POS, and WMS.
+- Calculate available inventory and apply operational rules.
+- Predict delivery dates using historical delivery records.
+- Record actual results to serve model training.
 
-Không thực hiện ghi ngược hoặc cập nhật tồn kho vào hệ thống nguồn trong MVP.
+The MVP does not write inventory updates back to source systems.
 
 ---
 
-# 2. Kiến trúc tổng thể
+# 2. Overall Architecture
 
-## 2.1. Kiến trúc logic
+## 2.1. Logical Architecture
 
 ```mermaid
 flowchart TB
@@ -123,115 +123,115 @@ flowchart TB
     ML --> DP
 ```
 
-## 2.2. Các thành phần chính
+## 2.2. Key Components
 
-| Thành phần | Trách nhiệm |
+| Component | Responsibility |
 |---|---|
-| Country Adapters | Kết nối và chuyển đổi dữ liệu từ hệ thống nguồn |
-| Event Bus | Truyền tải các thay đổi tồn kho và giao dịch |
-| Canonical Data Layer | Chuẩn hóa dữ liệu sản phẩm, địa điểm và tồn kho |
-| Inventory Assessment | Đánh giá độ tin cậy và khả năng có hàng |
-| Fulfillment Assessment | Xác định các nguồn có thể đáp ứng đơn |
-| Delivery Prediction | Dự báo ngày giao và khả năng giao đúng hạn |
-| Risk Assessment | Tổng hợp các rủi ro ảnh hưởng đến lời hứa |
-| Decision & Optimization | Chọn phương án cam kết phù hợp |
-| Feedback & Training | Ghi nhận kết quả thực tế và huấn luyện lại mô hình |
+| Country Adapters | Connect and transform data from the source system |
+| Event Bus | Propagate inventory changes and transactions |
+| Canonical Data Layer | Standardize product, location, and inventory data |
+| Inventory Assessment | Evaluate reliability and stock availability |
+| Fulfillment Assessment | Identify sources that can fulfill orders |
+| Delivery Prediction | Forecast delivery date and on-time delivery capability |
+| Risk Assessment | Aggregate risks affecting promises |
+| Decision & Optimization | Select appropriate commitment strategies |
+| Feedback & Training | Record actual results and retrain the model |
 
 ---
 
-# 3. Thiết kế dữ liệu huấn luyện
+# 3. Training data design
 
-Đây là nền tảng quan trọng nhất của Promise Engine. Mô hình chỉ có thể dự báo đáng tin cậy nếu dữ liệu phản ánh được cả trạng thái tại thời điểm ra quyết định và kết quả thực tế sau đó.
+This is the most important foundation for the Promise Engine. A model can predict reliably only if the data records both what was known at decision time and what actually happened afterward.
 
-## 3.1. Nguồn dữ liệu
+## 3.1. Data sources
 
-| Nguồn | Dữ liệu cần lấy | Mục đích |
+| Source | Data to retrieve | Purpose |
 |---|---|---|
-| ERP | Product, inventory, reserved stock, purchase orders | Trạng thái tồn kho và sản phẩm |
-| POS | Sales transactions, returns, stock adjustments | Tốc độ tiêu thụ và biến động tồn kho |
-| WMS | Receipts, picking, packing, stock movements | Khả năng xử lý đơn và tồn kho thực tế |
-| TMS / Carrier | Shipment, tracking, delivery timestamps | Huấn luyện mô hình giao hàng |
-| Store / DC | Stock count, cycle count, discrepancy | Xác định độ chính xác tồn kho |
-| Promise Engine | Promise requests, decisions, confidence, reasons | Lưu lại dự báo tại thời điểm cam kết |
+| ERP | Product, inventory, reserved stock, purchase orders | Inventory and product status |
+| POS | Sales transactions, returns, stock adjustments | Consumption rate and inventory fluctuation |
+| WMS | Receipts, picking, packing, stock movements | Order processing capacity and actual inventory |
+| TMS / Carrier | Shipment, tracking, delivery timestamps | Delivery model training |
+| Store / DC | Stock count, cycle count, discrepancy | Inventory accuracy determination |
+| Promise Engine | Promise requests, decisions, confidence, reasons | Preserve what was predicted at decision time |
 
-Nếu MVP chưa kết nối được TMS, có thể sử dụng lịch sử giao hàng hiện có từ ERP hoặc WMS, nhưng cần đánh giá chất lượng và mức độ đầy đủ của dữ liệu này.
+If the MVP is not connected to TMS, you can use the existing delivery history from ERP or WMS, but you need to evaluate the quality and completeness of this data.
 
-## 3.2. Các nhóm dữ liệu huấn luyện
+## 3.2. Training data groups
 
-### A. Product và Location
+### A. Product and Location
 
-Mô tả đặc điểm sản phẩm và địa điểm lưu kho.
+Product characteristics and warehouse location description.
 
 | Field | Type | Description |
 |---|---|---|
-| product_id | string | ID sản phẩm chuẩn |
-| category_id | string | Nhóm sản phẩm |
-| product_type | string | Loại sản phẩm |
-| storage_type | string | Điều kiện lưu trữ |
-| location_id | string | Store hoặc DC |
+| product_id | string | Standard product ID |
+| category_id | string | Product group |
+| product_type | string | Product type |
+| storage_type | string | Storage conditions |
+| location_id | string | Store or DC |
 | location_type | string | STORE / DC |
-| country | string | Quốc gia |
-| region | string | Khu vực |
-| handling_class | string | Nhóm xử lý hàng hóa |
+| country | string | Country |
+| region | string | Region |
+| handling_class | string | Goods processing group |
 
-Những thuộc tính này có thể ảnh hưởng đến sai lệch tồn kho, tốc độ xử lý đơn và thời gian giao hàng.
+These attributes may affect inventory discrepancies, order processing speed, and delivery time.
 
 ### B. Inventory Snapshot
 
-Lưu lại trạng thái tồn kho tại từng thời điểm.
+Save inventory status at each point in time.
 
 | Field | Type | Description |
 |---|---|---|
-| snapshot_id | string | ID snapshot |
-| product_id | string | Sản phẩm |
-| location_id | string | Địa điểm |
-| snapshot_time | timestamp | Thời điểm ghi nhận |
-| on_hand | integer | Số lượng hệ thống ghi nhận |
-| reserved | integer | Số lượng đã giữ chỗ |
-| allocated | integer | Số lượng đã phân bổ |
-| inbound | integer | Số lượng hàng đang về |
-| last_count_time | timestamp | Lần kiểm kê gần nhất |
-| source_updated_at | timestamp | Thời điểm hệ thống nguồn cập nhật |
-| received_at | timestamp | Thời điểm Promise Hub nhận dữ liệu |
+| snapshot_id | string | Snapshot ID |
+| product_id | string | Product |
+| location_id | string | Location |
+| snapshot_time | timestamp | Time the snapshot was recorded |
+| on_hand | integer | Recorded system stock |
+| reserved | integer | Reserved quantity |
+| allocated | integer | Allocated Quantity |
+| inbound | integer | In-Transit Quantity |
+| last_count_time | timestamp | Latest Inventory Count |
+| source_updated_at | timestamp | System Source Update Time |
+| received_at | timestamp | Promise Hub Data Receipt Time |
 
-**Lưu ý:** `source_updated_at` và `received_at` cần được lưu riêng để xác định độ trễ đồng bộ.
+**Note:** `source_updated_at` and `received_at` must be stored separately to determine synchronization lag.
 
 ### C. Inventory Events
 
-Lưu các sự kiện làm thay đổi tồn kho.
+Log events that change inventory.
 
 | Field | Type | Description |
 |---|---|---|
-| event_id | string | ID sự kiện |
-| product_id | string | Sản phẩm |
-| location_id | string | Địa điểm |
+| event_id | string | Event ID |
+| product_id | string | Product |
+| location_id | string | Location |
 | event_type | string | SALE / RETURN / RECEIPT / ADJUSTMENT / TRANSFER |
-| quantity_delta | integer | Thay đổi số lượng |
-| event_time | timestamp | Thời điểm nghiệp vụ |
-| received_at | timestamp | Thời điểm hệ thống nhận |
+| quantity_delta | integer | Quantity Change |
+| event_time | timestamp | Business Event Time |
+| received_at | timestamp | System Receive Time |
 | source_system | string | ERP / POS / WMS |
-| transaction_id | string | ID giao dịch nguồn |
+| transaction_id | string | Source Transaction ID |
 
-Dữ liệu event cần hỗ trợ xử lý trùng lặp, sự kiện đến muộn và sai thứ tự.
+The data pipeline must handle duplicate, late, and out-of-order events.
 
-### D. Inventory Count và Discrepancy
+### D. Inventory Count and Discrepancy
 
-Đây là dữ liệu quan trọng để huấn luyện Inventory Confidence Model.
+This is the important data for training the Inventory Confidence Model.
 
 | Field | Type | Description |
 |---|---|---|
-| count_id | string | ID kiểm kê |
-| product_id | string | Sản phẩm |
-| location_id | string | Địa điểm |
-| count_time | timestamp | Thời điểm kiểm kê |
-| system_on_hand | integer | Tồn kho hệ thống trước kiểm kê |
-| actual_on_hand | integer | Tồn kho thực tế |
-| discrepancy | integer | Chênh lệch |
-| discrepancy_ratio | float | Tỷ lệ chênh lệch |
+| count_id | string | Inventory Count ID |
+| product_id | string | Product |
+| location_id | string | Location |
+| count_time | timestamp | Count time |
+| system_on_hand | integer | System inventory before check |
+| actual_on_hand | integer | Actual inventory |
+| discrepancy | integer | Difference |
+| discrepancy_ratio | float | Difference ratio |
 | count_type | string | CYCLE_COUNT / FULL_COUNT |
-| verified | boolean | Kết quả đã xác minh hay chưa |
+| verified | boolean | Verified or not |
 
-Công thức:
+Formula:
 
 $$
 Discrepancy = SystemOnHand - ActualOnHand
@@ -243,161 +243,161 @@ DiscrepancyRatio =
 {\max(ActualOnHand,1)}
 $$
 
-Ví dụ:
+Example:
 
-- Hệ thống ghi nhận: 20 sản phẩm.
-- Kiểm kê thực tế: 17 sản phẩm.
+- System records: 20 items.
+- Physical count: 17 items.
 - Discrepancy = 3.
 - Discrepancy Ratio = 17.65%.
 
-Không nên coi mọi kết quả kiểm kê là nhãn tuyệt đối chính xác nếu quy trình kiểm kê có sai số. Cần lưu nguồn, thời điểm và phương pháp xác minh.
+Do not assume every count is perfectly accurate; the counting process can also make mistakes. Record its source, time, and verification method.
 
-### E. Delivery và Fulfillment History
+### E. Delivery and Fulfillment History
 
-Dữ liệu dùng để huấn luyện Delivery Prediction Model.
+Data used for training the Delivery Prediction Model.
 
 | Field | Type | Description |
 |---|---|---|
-| order_id | string | ID đơn hàng |
-| product_id | string | Sản phẩm |
-| quantity | integer | Số lượng |
-| source_location_id | string | Kho/cửa hàng xuất hàng |
-| destination_id | string | Điểm nhận |
-| order_created_at | timestamp | Thời điểm tạo đơn |
-| order_cutoff_time | timestamp | Thời điểm cutoff |
-| picking_started_at | timestamp | Bắt đầu picking |
-| picking_completed_at | timestamp | Hoàn tất picking |
-| packed_at | timestamp | Hoàn tất đóng gói |
-| shipped_at | timestamp | Thời điểm xuất hàng |
-| promised_at | timestamp | Thời điểm đã cam kết |
-| delivered_at | timestamp | Thời điểm giao thực tế |
-| carrier_id | string | Đơn vị vận chuyển |
+| order_id | string | Order ID |
+| product_id | string | Product |
+| quantity | integer | Quantity |
+| source_location_id | string | Warehouse/Store for picking |
+| destination_id | string | Pickup point |
+| order_created_at | timestamp | Order creation time |
+| order_cutoff_time | timestamp | Cutoff time |
+| picking_started_at | timestamp | Start picking |
+| picking_completed_at | timestamp | End picking |
+| packed_at | timestamp | End packaging |
+| shipped_at | timestamp | Shipment time |
+| promised_at | timestamp | Committed time |
+| delivered_at | timestamp | Actual delivery time |
+| carrier_id | string | Carrier unit |
 | delivery_type | string | HOME / STORE_PICKUP |
-| delivery_status | string | Trạng thái cuối cùng |
+| delivery_status | string | Final status |
 
-Nếu có dữ liệu, bổ sung:
+If data exists, add:
 
 - Route distance.
 - Number of stops.
 - Warehouse workload.
 - Carrier capacity.
-- Weather hoặc seasonal features.
+- Weather or seasonal features.
 - Failed delivery attempts.
 - Delivery exception reason.
 
-Không bắt buộc phải có toàn bộ các trường này trong MVP.
+It is not necessary to have all fields in the MVP.
 
 ### F. Promise Decision Log
 
-Mọi quyết định phải được lưu lại để đánh giá mô hình.
+All decisions must be recorded for model evaluation.
 
 | Field | Type | Description |
 |---|---|---|
-| promise_id | string | ID lời hứa |
-| request_time | timestamp | Thời điểm yêu cầu |
-| product_id | string | Sản phẩm |
-| requested_quantity | integer | Số lượng yêu cầu |
-| destination_id | string | Điểm nhận |
-| selected_source_id | string | Nguồn cung được chọn |
-| inventory_confidence | float | Độ tin cậy tồn kho |
-| fulfillment_probability | float | Xác suất đáp ứng đủ hàng |
-| on_time_probability | float | Xác suất giao đúng hạn |
-| promise_success_probability | float | Xác suất thành công tổng thể |
-| promised_at | timestamp | Ngày đã hứa |
+| promise_id | string | Promise ID |
+| request_time | timestamp | Request time |
+| product_id | string | Product |
+| requested_quantity | integer | Request quantity |
+| destination_id | string | Point of receipt |
+| selected_source_id | string | Selected supply source |
+| inventory_confidence | float | Inventory reliability |
+| fulfillment_probability | float | Stock fulfillment probability |
+| on_time_probability | float | On-time delivery probability |
+| promise_success_probability | float | Overall success probability |
+| promised_at | timestamp | Promised date |
 | decision | string | PROMISE / VERIFY / REJECT |
-| decision_reason | json | Các yếu tố ảnh hưởng |
-| rules_version | string | Phiên bản luật |
-| model_version | string | Phiên bản mô hình |
+| decision_reason | json | Influencing factors |
+| rules_version | string | Policy version |
+| model_version | string | Model version |
 
-**Yêu cầu bắt buộc:** lưu các feature và kết quả tính toán tại thời điểm ra quyết định. Không được dùng dữ liệu cập nhật sau này để tái tạo giả định rằng hệ thống đã biết thông tin đó tại thời điểm cam kết.
+**Required:** Store the features and computed outputs as they were at decision time. Do not reconstruct them later from updated data and assume that information was available when the promise was made.
 
 ---
 
-# 4. Xây dựng nhãn huấn luyện (Training Labels)
+# 4. Build training labels (Training Labels)
 
-Cần xây dựng nhãn riêng cho từng bài toán, thay vì huấn luyện một mô hình tổng hợp ngay từ đầu.
+Need to build a separate label for each problem, rather than training a unified model from the start.
 
 ## 4.1. Inventory Confidence Model
 
-**Mục tiêu:** dự báo khả năng số liệu tồn kho hệ thống nằm trong sai số chấp nhận được so với tồn kho thực tế.
+**Objective:** Predict the system inventory data within an acceptable error margin compared to actual inventory.
 
-Nhãn nhị phân:
+Binary label:
 
 $$
 Y_{inventory} =
 \begin{cases}
-1 & \text{Nếu } |SystemStock-ActualStock| \leq Tolerance\\
-0 & \text{Ngược lại}
+1 & \text{If } |SystemStock-ActualStock| \leq Tolerance\\
+0 & \text{Otherwise}
 \end{cases}
 $$
 
-Ví dụ:
+Example:
 
-- Tolerance = 1 sản phẩm hoặc một tỷ lệ sai lệch được nghiệp vụ phê duyệt.
-- Hệ thống ghi 20, kiểm kê 19 → nhãn 1.
-- Hệ thống ghi 20, kiểm kê 15 → nhãn 0.
+- Tolerance =  1 product or an approved error rate.
+- System records 20, physical count 19 → label 1.
+- System records 20, physical count 15 → label 0.
 
-Nên đánh giá thêm các tolerance khác nhau theo nhóm sản phẩm và quy mô tồn kho.
+Should evaluate additional tolerances for different product groups and inventory scales.
 
-**Đầu ra mô hình:**
+**Model output:**
 
 $$
 P(InventoryAccurate \mid X)
 $$
 
-Đây là xác suất độ chính xác của số liệu tồn kho, không phải xác suất đáp ứng đơn hàng.
+This is the probability of inventory data accuracy, not the order fulfillment probability.
 
 ## 4.2. Fulfillment Probability Model
 
-**Mục tiêu:** dự báo khả năng đáp ứng đủ số lượng yêu cầu tại một nguồn cung.
+**Objective:** Forecast the ability to meet the required quantity at a supply source.
 
-Nhãn:
+Label:
 
 $$
 Y_{fulfillment} =
 \begin{cases}
-1 & \text{Nếu đáp ứng đủ số lượng yêu cầu}\\
-0 & \text{Nếu không đáp ứng đủ}
+1 & \text{If meets required quantity}\\
+0 & \text{If does not meet quantity}
 \end{cases}
 $$
 
-Nhãn cần được xác định từ kết quả picking/fulfillment thực tế, đối chiếu với số lượng khách yêu cầu.
+The label should be determined from the actual picking/fulfillment result, compared with the required quantity by customers.
 
-Ví dụ:
+Example:
 
 - Requested quantity = 10.
-- Picked quantity = 10 → nhãn 1.
-- Picked quantity = 8 → nhãn 0 nếu nghiệp vụ yêu cầu đủ 10.
+- Picked quantity = 10 → label 1.
+- Picked quantity = 8 → label 0 if the order requires 10.
 
-Không nên dùng đơn hàng bị hủy do khách đổi ý làm nhãn thất bại nếu nguyên nhân không liên quan đến tồn kho.
+Do not use canceled orders due to customer changes as label failures if the reason is not related to inventory.
 
 ## 4.3. Delivery Prediction Model
 
-**Mục tiêu:** dự báo khả năng giao đúng thời điểm đã cam kết.
+**Objective:** Forecast the ability to deliver on the promised time.
 
-Nhãn:
+Label:
 
 $$
 Y_{on\_time} =
 \begin{cases}
-1 & \text{Nếu DeliveredAt} \leq \text{PromisedAt}\\
-0 & \text{Nếu giao muộn}
+1 & \text{If DeliveredAt} \leq \text{PromisedAt}\\
+0 & \text{If delivered late}
 \end{cases}
 $$
 
-Các trường hợp cần xử lý riêng:
+Special cases to handle:
 
-- Đơn hủy trước khi xuất kho.
-- Đơn không giao được do khách vắng mặt.
-- Đơn bị hủy do thiếu hàng.
-- Đơn có ngày cam kết bị thay đổi.
-- Đơn không có timestamp giao hàng hợp lệ.
+- Pre-shipment cancellation.
+- Order not delivered due to customer absence.
+- Order canceled due to stock shortage.
+- Order with commitment date changed.
+- Order without valid delivery timestamp.
 
-Không gộp tất cả các trường hợp trên thành nhãn 0. Cần phân loại nguyên nhân để tránh làm sai lệch mô hình.
+Do not combine all the above cases into label 0. Need to classify the root causes to avoid model bias.
 
 ## 4.4. Promise Success Model
 
-Trong giai đoạn đầu, có thể tính xác suất thành công tổng thể từ các thành phần.
+In the initial phase, the overall success probability can be calculated from the components.
 
 $$
 P(PromiseSuccess)
@@ -405,7 +405,7 @@ P(PromiseSuccess)
 P(FulfillmentSuccess \cap OnTime)
 $$
 
-Nếu tạm giả định hai sự kiện độc lập:
+If we assume two events are independent:
 
 $$
 P(PromiseSuccess)
@@ -415,116 +415,116 @@ P(FulfillmentSuccess)
 P(OnTime)
 $$
 
-Đây chỉ là phép xấp xỉ. Trong thực tế, hai yếu tố có thể phụ thuộc nhau, ví dụ kho quá tải vừa làm tăng nguy cơ thiếu hàng vừa làm chậm giao hàng.
+This is only an approximation. In reality, two factors may be interdependent, for example, warehouse overload may increase the risk of stock shortage and delay delivery.
 
-Giai đoạn MVP nên dùng phép tính này với giả định được ghi rõ. Khi có đủ dữ liệu, cần xây dựng mô hình xác suất kết hợp hoặc mô phỏng để tính trực tiếp xác suất thành công tổng thể.
+The MVP phase should use this calculation with clearly stated assumptions. When sufficient data is available, build a joint probability model or simulation to directly calculate the overall success probability.
 
 ---
 
-# 5. Thiết kế Feature Engineering
+# 5. Feature Engineering Design
 
-## 5.1. Features cho Inventory Confidence
+## 5.1. Inventory Confidence features
 
-| Feature | Mô tả | Nguồn |
+| Feature | Description | Source |
 |---|---|---|
-| stock_age_hours | Số giờ từ lần cập nhật tồn kho gần nhất | ERP / WMS |
-| days_since_last_count | Số ngày từ lần kiểm kê gần nhất | Stock Count |
-| sales_velocity_7d | Tốc độ bán 7 ngày | POS |
-| sales_velocity_30d | Tốc độ bán 30 ngày | POS |
-| stock_adjustment_rate | Tỷ lệ điều chỉnh tồn kho | ERP / WMS |
-| historical_discrepancy | Sai lệch kiểm kê lịch sử | Stock Count |
-| pending_transactions | Số giao dịch chưa đồng bộ | POS / ERP |
-| source_latency | Độ trễ dữ liệu nguồn | Integration |
-| stock_level | Số lượng tồn kho hiện tại | ERP / WMS |
-| product_category | Nhóm sản phẩm | Product Master |
+| stock_age_hours | Hours since last inventory update | ERP / WMS |
+| days_since_last_count | Days since last physical count | Stock Count |
+| sales_velocity_7d | 7-day sales velocity | POS |
+| sales_velocity_30d | 30-day sales velocity | POS |
+| stock_adjustment_rate | Inventory adjustment ratio | ERP / WMS |
+| historical_discrepancy | Historical physical count variance | Stock Count |
+| pending_transactions | Out-of-sync transactions count | POS / ERP |
+| source_latency | Source data latency | Integration |
+| stock_level | Current inventory count | ERP / WMS |
+| product_category | Product Group | Product Master |
 | location_type | Store / DC | Location |
 
-Các feature dạng thời gian phải được tính theo dữ liệu tồn tại tại `request_time`, tránh data leakage.
+Time-based features must be calculated using data available at `request_time`, to avoid data leakage.
 
-## 5.2. Features cho Fulfillment
+## 5.2. Fulfillment features
 
-| Feature | Mô tả |
+| Feature | Description |
 |---|---|
-| requested_quantity | Số lượng khách yêu cầu |
-| effective_atp | Available-to-Promise sau khi trừ các phần không thể cam kết |
-| inventory_confidence | Xác suất độ tin cậy tồn kho |
-| sales_velocity | Tốc độ tiêu thụ |
-| pending_allocations | Số lượng đang chờ phân bổ |
-| inbound_reliability | Độ tin cậy hàng đang về |
-| location_type | Loại địa điểm |
-| warehouse_capacity | Khả năng xử lý còn lại |
-| picking_workload | Khối lượng picking hiện tại |
+| requested_quantity | Requested quantity |
+| effective_atp | Available-to-Promise after excluding non-promiseable portions |
+| inventory_confidence | Stock Reliability Probability |
+| sales_velocity | Consumption Rate |
+| pending_allocations | Quantity in Allocation Queue |
+| inbound_reliability | Inbound Reliability |
+| location_type | Location Type |
+| warehouse_capacity | Remaining Processing Capacity |
+| picking_workload | Current Picking Volume |
 
-## 5.3. Features cho Delivery Prediction
+## 5.3. Delivery Prediction features
 
-| Feature | Mô tả |
+| Feature | Description |
 |---|---|
-| source_location | Kho/cửa hàng xuất hàng |
-| destination_region | Khu vực nhận |
-| distance | Khoảng cách vận chuyển |
-| carrier_id | Đơn vị vận chuyển |
-| delivery_type | Hình thức giao |
-| order_hour | Giờ tạo đơn |
-| order_weekday | Ngày trong tuần |
-| cutoff_remaining | Thời gian còn lại đến cutoff |
-| picking_workload | Tải xử lý tại kho |
-| historical_lane_delay | Lịch sử trễ của tuyến |
-| carrier_on_time_rate | Tỷ lệ giao đúng hạn của carrier |
-| order_size | Quy mô đơn hàng |
-| seasonality | Mùa vụ hoặc dịp cao điểm |
+| source_location | Shipping warehouse or store |
+| destination_region | Receiving area |
+| distance | Transportation distance |
+| carrier_id | Shipping unit |
+| delivery_type | Delivery method |
+| order_hour | Order creation time |
+| order_weekday | Day of the week |
+| cutoff_remaining | Remaining time to cutoff |
+| picking_workload | Warehouse processing load |
+| historical_lane_delay | Historical delays on the lane |
+| carrier_on_time_rate | On-time delivery rate of carrier |
+| order_size | Order scale |
+| seasonality | Peak season or peak event |
 
-Cần loại bỏ mọi feature chỉ xuất hiện sau khi sự kiện giao hàng đã xảy ra, chẳng hạn `delivered_at`, khi huấn luyện mô hình dự báo trước giao hàng.
+Remove all features that appear after the delivery event has occurred, for example `delivered_at`, when training the pre-delivery forecast model.
 
 ---
 
-# 6. Mô hình hóa (Modeling Strategy)
+# 6. Modeling Strategy
 
-## 6.1. Chiến lược tổng thể
+## 6.1. Overall Strategy
 
-Không nên đưa tất cả bài toán vào một mô hình duy nhất.
+Do not include all problems in a single model.
 
-Đề xuất ba mô hình độc lập:
+Propose three independent models:
 
-| Model | Bài toán | Đầu ra |
+| Model | Problem | Output |
 |---|---|---|
-| Inventory Confidence Model | Độ chính xác tồn kho | Probability 0–1 |
-| Fulfillment Model | Khả năng đáp ứng số lượng | Probability 0–1 |
-| Delivery Model | Khả năng giao đúng hạn | Probability 0–1 |
+| Inventory Confidence Model | Inventory accuracy | Probability 0–1 |
+| Fulfillment Model | Quantity fulfillment capability | Probability 0–1 |
+| Delivery Model | On-time delivery capability | Probability 0–1 |
 
-Promise Decision Layer tổng hợp kết quả từ các mô hình và luật nghiệp vụ.
+Promise Decision Layer synthesizes results from models and business rules.
 
-## 6.2. Giai đoạn 1 – Rule-based Baseline
+## 6.2. Phase 1 – Rule-based Baseline
 
-Mục tiêu là xây dựng hệ thống hoạt động được ngay cả khi chưa có đủ dữ liệu huấn luyện.
+The goal is to build a system that operates even when sufficient training data is not available.
 
 ### Inventory Confidence Rules
 
-Khởi tạo confidence = 100, sau đó trừ điểm theo các rủi ro.
+Initialize confidence = 100, then subtract points based on risks.
 
-Ví dụ:
+Example:
 
-| Điều kiện | Điểm trừ tham khảo |
+| Condition | Reference points deducted |
 |---|---:|
-| Không kiểm kê trên 30 ngày | -15 |
-| Không đồng bộ giao dịch | -20 |
-| Sai lệch lịch sử cao | -20 |
-| Sản phẩm có tốc độ bán cao | -10 |
-| Dữ liệu nguồn chậm | -15 |
+| More than 30 days since the last count | -15 |
+| Transaction desynchronization | -20 |
+| High historical discrepancy | -20 |
+| High sales velocity product | -10 |
+| Slow data source | -15 |
 
 $$
 ConfidenceScore =
 \max(0,100-\sum Penalties)
 $$
 
-Phân nhóm ban đầu:
+Initial grouping:
 
-| Score | Band | Ý nghĩa |
+| Score | Band | Meaning |
 |---:|---|---|
-| ≥85 | HIGH | Có thể tiếp tục xét cam kết |
-| 65–84 | MEDIUM | Cần kiểm tra thêm hoặc giảm số lượng |
-| <65 | LOW | Không nên cam kết tự động |
+| ≥85 | HIGH | Can continue to consider commitment |
+| 65–84 | MEDIUM | Verify stock or reduce the promised quantity |
+| <65 | LOW | Should not commit automatically |
 
-Các điểm trừ và ngưỡng trên là giá trị khởi tạo để pilot, không phải ngưỡng đã được kiểm chứng. Cần hiệu chỉnh bằng dữ liệu thực tế.
+The penalties and thresholds are initial values for pilot, not verified thresholds. Need to be adjusted with actual data.
 
 ### ATP Calculation
 
@@ -532,21 +532,21 @@ $$
 ATP = OnHand - Reserved - Allocated - SafetyBuffer
 $$
 
-Trong đó:
+Where:
 
 $$
 SafetyBuffer =
 OnHand \times (1-Confidence/100)\times k
 $$
 
-`k` là hệ số điều chỉnh ban đầu, ví dụ 0.5. Cần hiệu chỉnh theo nhóm sản phẩm, địa điểm và mức độ rủi ro.
+`k` is the initial adjustment coefficient, e.g. 0.5. Need to adjust based on product group, location, and risk level.
 
-Không đưa inbound stock vào ATP mặc định. Chỉ tính inbound khi:
+Do not include inbound stock in default ATP. Only calculate inbound when:
 
-- Có thời điểm đến dự kiến.
-- Có đủ độ tin cậy về nguồn hàng.
-- Hàng đến trước thời điểm fulfillment cần thiết.
-- Có thể nhận và xử lý hàng đúng quy trình.
+- There is an expected arrival time.
+- There is sufficient supply chain reliability.
+- Goods arrive before the required fulfillment time.
+- Can receive and process goods in accordance with the procedure.
 
 ### Delivery Rules
 
@@ -555,28 +555,28 @@ EstimatedDelivery =
 Cutoff + ProcessingTime + TransitTime
 $$
 
-Cần xét thêm:
+Need to consider further:
 
-- Lịch làm việc kho.
-- Ngày nghỉ.
-- Thời gian picking/packing.
-- Thời gian vận chuyển theo tuyến.
-- Cutoff của carrier.
-- Năng lực xử lý hiện tại.
+- Warehouse schedule.
+- Days off.
+- Picking/packing time.
+- Line shipping time.
+- Carrier cutoff time.
+- Current processing capacity.
 
-## 6.3. Giai đoạn 2 – Machine Learning
+## 6.3. Stage 2 – Machine Learning
 
 ### A. Inventory Confidence Model
 
-**Mô hình khởi đầu:** Logistic Regression hoặc Gradient Boosting.
+**Initial model:** Logistic Regression or Gradient Boosting.
 
-Đề xuất:
+Proposal:
 
-- Logistic Regression để tạo baseline dễ giải thích.
-- LightGBM / XGBoost / HistGradientBoosting để nắm bắt quan hệ phi tuyến.
-- Calibrated probabilities để đầu ra phản ánh xác suất thực tế.
+- Logistic Regression to create an interpretable baseline.
+- LightGBM / XGBoost / HistGradientBoosting to capture nonlinear relationships.
+- Calibrated probabilities to ensure output reflects actual probabilities.
 
-Input: các feature trong phần 5.1.
+Input: features from section 5.1.
 
 Output:
 
@@ -584,7 +584,7 @@ $$
 P(|SystemStock-ActualStock|\leq Tolerance)
 $$
 
-Ví dụ:
+Example:
 
 ```json
 {
@@ -595,27 +595,27 @@ Ví dụ:
 
 ### B. Fulfillment Model
 
-Mục tiêu là dự báo khả năng đáp ứng đủ số lượng.
+The goal is to forecast the ability to meet the required quantity.
 
-Mô hình đề xuất:
+Proposed model:
 
 - Logistic Regression baseline.
-- Gradient Boosting khi đủ dữ liệu.
-- Có thể bổ sung mô hình dự báo phân phối sai lệch tồn kho để tính xác suất có đủ hàng.
+- Gradient Boosting when sufficient data is available.
+- It is possible to add a model that forecasts the skewed inventory distribution to calculate the probability of having sufficient stock.
 
-Nếu mô hình Inventory Confidence dự báo xác suất số tồn kho chính xác, không nên mặc định dùng trực tiếp xác suất đó như xác suất đáp ứng đơn. Cần kết hợp với số lượng yêu cầu, tồn kho khả dụng, độ lệch tồn kho và quy tắc phân bổ.
+If the Inventory Confidence model forecasts the accurate probability of stock levels, it should not be directly used as the probability of fulfilling an order. It needs to be combined with the order quantity, available inventory, stock deviation, and allocation rules.
 
 ### C. Delivery Prediction Model
 
-**Mô hình đề xuất:** Gradient Boosting Classifier.
+**Proposed model:** Gradient Boosting Classifier.
 
-Mục tiêu:
+Goal:
 
 $$
 P(OnTime \mid X)
 $$
 
-Đầu ra:
+Output:
 
 ```json
 {
@@ -624,96 +624,96 @@ $$
 }
 ```
 
-Mô hình nên dự báo xác suất giao đúng hạn theo từng phương án ngày giao, thay vì chỉ dự báo một thời gian vận chuyển trung bình.
+The model should forecast the probability of on-time delivery per delivery date scenario, rather than forecasting a single average shipping time.
 
 ### D. Probability Calibration
 
-Đây là bước bắt buộc trước khi dùng xác suất để cam kết.
+This is a mandatory step before using probability to commit.
 
-Các phương pháp:
+Methods:
 
 - Platt Scaling.
 - Isotonic Regression.
 
-Đánh giá bằng:
+Evaluated by:
 
 - Brier Score.
 - Reliability Diagram.
-- Expected Calibration Error (ECE), nếu phù hợp.
-- Precision / Recall tại các ngưỡng quyết định.
+- Expected Calibration Error (ECE), if applicable.
+- Precision / Recall at decision thresholds.
 
-Ví dụ:
+Example:
 
-Nếu mô hình đưa ra 100 trường hợp có xác suất thành công 90%, thực tế khoảng 90 trường hợp cần thành công. Nếu chỉ có 70 trường hợp thành công, mô hình đang quá tự tin.
+If the model predicts 100 cases with a 90% success probability, approximately 90 cases need to succeed. If only 70 cases succeed, the model is overly confident.
 
-## 6.4. Chia tập dữ liệu huấn luyện
+## 6.4. Split the training data
 
-Không nên chia ngẫu nhiên đơn thuần vì dữ liệu có yếu tố thời gian.
+Do not randomly split the data because the data has temporal factors.
 
-Đề xuất:
+Recommendation:
 
-| Dataset | Khoảng thời gian |
+| Dataset | Time window |
 |---|---|
-| Training | Các giai đoạn lịch sử đầu tiên |
-| Validation | Giai đoạn tiếp theo |
-| Test | Giai đoạn gần nhất |
+| Training | First historical stages |
+| Validation | Next historical stage |
+| Test | Most recent historical stage |
 
-Ví dụ nếu có dữ liệu 12 tháng:
+Example if data spans 12 months:
 
-- Training: tháng 1–8.
-- Validation: tháng 9–10.
-- Test: tháng 11–12.
+- Training: months 1–8.
+- Validation: months 9–10.
+- Test: months 11–12.
 
-Cần bảo đảm không để các bản ghi tương lai lọt vào feature của bản ghi quá khứ.
+Ensure that future records do not leak into past records' features.
 
-Nên đánh giá thêm khả năng tổng quát hóa giữa các cửa hàng, kho và nhóm sản phẩm.
+Also evaluate generalization capability across stores, warehouses, and product categories.
 
-## 6.5. Điều kiện chuyển từ Rules sang ML
+## 6.5. Conditions for transitioning from Rules to ML
 
-Chỉ bật ML trong production khi:
+Only enable ML in production when:
 
-1. Nhãn huấn luyện đủ số lượng và chất lượng.
-2. Dữ liệu có độ phủ hợp lý theo cửa hàng, sản phẩm và thời gian.
-3. Mô hình tốt hơn baseline trên tập test độc lập.
-4. Xác suất được calibration.
-5. Không có suy giảm nghiêm trọng ở nhóm sản phẩm hoặc địa điểm quan trọng.
-6. Có model version, monitoring và rollback.
+1. Training labels are sufficient in quantity and quality.
+2. Reasonable coverage data by store, product, and time.
+3. Better model than baseline on independent test set.
+4. Calibrated probabilities.
+5. No significant degradation in critical product or location groups.
+6. Model version, monitoring, and rollback are in place.
 
-Nếu không đạt điều kiện, tiếp tục dùng Rules.
+If conditions are not met, continue using Rules.
 
 ---
 
-# 7. Quy trình xử lý Promise Request
+# 7. Promise Request Processing Procedure
 
-## 7.1. Bước 1 – Nhận yêu cầu
+## 7.1. Step 1 – Receive Request
 
-Đầu vào:
+Input:
 
 - Product ID.
 - Requested quantity.
 - Destination.
 - Delivery type.
 - Requested delivery date.
-- Customer service level, nếu có.
+- Customer service level, if applicable.
 
-Kiểm tra dữ liệu đầu vào và chuẩn hóa product/location identifier.
+Check and standardize input data and product/location identifiers.
 
-## 7.2. Bước 2 – Kiểm tra chất lượng dữ liệu
+## 7.2. Step 2 – Check data quality
 
-Kiểm tra:
+Check:
 
-- Sản phẩm đã được mapping đúng chưa.
-- Location có tồn tại không.
-- Snapshot tồn kho có đủ mới không.
-- Event có bị thiếu hoặc chưa đồng bộ không.
-- Có transaction trùng lặp không.
-- Có dữ liệu bất thường không.
+- Has the product been mapped correctly?
+- Does the location exist?
+- Is the inventory snapshot sufficient?
+- Are there missing or unsynchronized events?
+- Are there duplicate transactions?
+- Are there any abnormal data?
 
-Nếu dữ liệu không đạt yêu cầu, không tự động đưa ra lời hứa có độ tin cậy cao.
+If the data does not meet the requirements, do not automatically provide a high-confidence guarantee.
 
-## 7.3. Bước 3 – Inventory Assessment
+## 7.3. Step 3 – Inventory Assessment
 
-Tính:
+Calculate:
 
 - Inventory Confidence.
 - Confidence Band.
@@ -746,73 +746,73 @@ def assess_inventory(stock, reserved, allocated, features):
     }
 ```
 
-Trong production cần bổ sung validation, làm tròn số lượng, xử lý thiếu dữ liệu và kiểm soát ngưỡng theo nghiệp vụ.
+In production, additional validation, rounding quantities, handling missing data, and business threshold controls need to be added.
 
-## 7.4. Bước 4 – Fulfillment Assessment
+## 7.4. Step 4 – Assess fulfillment
 
-Xác định các nguồn có thể cung cấp sản phẩm:
+Identify potential supply sources:
 
 - DC.
-- Store gần khách hàng.
-- Các location được phép fulfillment.
+- Store near customer.
+- Allowed fulfillment locations.
 
-Loại bỏ nguồn không đủ điều kiện:
+Remove suppliers that do not meet criteria:
 
-- ATP thấp hơn số lượng yêu cầu.
-- Confidence dưới ngưỡng.
-- Không có khả năng picking.
-- Không đáp ứng cutoff.
-- Không hỗ trợ delivery type tương ứng.
+- ATP below required quantity.
+- Confidence below threshold.
+- Unable to pick.
+- Does not meet cutoff.
+- Does not support corresponding delivery type.
 
-## 7.5. Bước 5 – Delivery Prediction
+## 7.5. Step 5 – Delivery Prediction
 
-Với mỗi nguồn cung hợp lệ:
+For each valid supplier:
 
-1. Xác định thời điểm có thể bắt đầu xử lý đơn.
-2. Tính thời gian picking và packing.
-3. Tính thời gian vận chuyển.
-4. Áp dụng lịch làm việc và cutoff.
-5. Tính xác suất giao đúng hạn.
-6. Đánh giá các ngày giao khả thi.
+1. Determine the earliest possible processing time.
+2. Calculate picking and packing time.
+3. Calculate shipping time.
+4. Apply work schedule and cutoff.
+5. Calculate on-time delivery probability.
+6. Evaluate feasible delivery dates.
 
-## 7.6. Bước 6 – Risk Assessment
+## 7.6. Step 6 – Risk Assessment
 
-Tổng hợp các yếu tố:
+Aggregate factors:
 
-- Rủi ro tồn kho.
-- Rủi ro fulfillment.
-- Rủi ro giao hàng.
-- Rủi ro đồng bộ dữ liệu.
-- Rủi ro năng lực xử lý.
+- Inventory risk.
+- Fulfillment risk.
+- Shipping risk.
+- Data synchronization risk.
+- Processing capacity risk.
 
-Xác suất tổng thể trong MVP:
+Overall probability in MVP:
 
 $$
 P_{success} =
 P_{fulfillment}\times P_{on-time}
 $$
 
-Công thức trên chỉ là phép xấp xỉ khi giả định độc lập. Khi có đủ dữ liệu, nên đánh giá mô hình joint probability để xử lý tương quan giữa các yếu tố.
+The formula above is only an approximation under the assumption of independence. When sufficient data is available, the joint probability model should be evaluated to handle correlations between factors.
 
-## 7.7. Bước 7 – Promise Decision
+## 7.7. Step 7 – Promise Decision
 
-Ngưỡng ban đầu đề xuất:
+Initial proposed threshold:
 
-| Probability | Decision | Ý nghĩa |
+| Probability | Decision | Meaning |
 |---:|---|---|
-| ≥95% | PROMISE | Có thể cam kết tự động |
-| 85–94.99% | VERIFY | Cần kiểm tra hoặc lựa chọn phương án khác |
-| <85% | REJECT | Không nên cam kết |
+| ≥95% | PROMISE | May promise automatically |
+| 85–94.99% | VERIFY | Requires checking or selecting an alternative option |
+| <85% | REJECT | Should not commit |
 
-Các ngưỡng này phải được hiệu chỉnh với Product và Operations dựa trên chi phí giao trễ, hủy đơn, mất doanh thu và tỷ lệ chấp nhận lời hứa.
+These thresholds must be adjusted with Product and Operations based on carry costs, cancellation rates, revenue loss, and promise acceptance rates.
 
-Không nên chỉ tối đa hóa xác suất thành công. Hệ thống cần cân bằng giữa độ tin cậy và tỷ lệ yêu cầu có thể đáp ứng (Promise Coverage).
+Should not only maximize success probability. The system needs to balance reliability and promise coverage (the percentage of requests that can be fulfilled).
 
-## 7.8. Bước 8 – Fulfillment Optimization
+## 7.8. Step 8 – Fulfillment Optimization
 
-Khi có nhiều nguồn cung khả thi, chọn phương án tối ưu.
+When multiple feasible supply options are available, select the optimal option.
 
-Hàm mục tiêu tham khảo:
+Reference objective function:
 
 $$
 Minimize:
@@ -823,59 +823,59 @@ C_{transport}
 +C_{risk}
 $$
 
-Ràng buộc:
+Constraints:
 
-- Tổng số lượng được chọn phải đủ số lượng yêu cầu.
-- Không vượt quá ATP.
-- Không vượt quá năng lực xử lý.
-- Phải đáp ứng thời gian giao hàng.
-- Tuân thủ các quy định về nguồn cung và vận chuyển.
+- The total quantity selected must meet the requested quantity.
+- Do not exceed ATP.
+- Do not exceed processing capacity.
+- Must meet delivery time.
+- Comply with supply and transportation regulations.
 
-Công cụ có thể sử dụng:
+Tools that can be used:
 
 - Google OR-Tools.
 - Mixed Integer Linear Programming (MILP).
 - Constraint Programming.
 
-**Giới hạn MVP:** ưu tiên một nguồn cung. Nếu không đủ, thử nguồn DC khác hoặc tối đa hai nguồn cung. Tối ưu multi-source đầy đủ nên để Phase 2.
+**MVP Limitation:** Prioritize one supply source. If insufficient, try another DC source or up to two supply sources. Optimize full multi-source for Phase 2.
 
-## 7.9. Bước 9 – Ghi nhận quyết định và Feedback
+## 7.9. Step 9 – Record decision and feedback
 
-Mỗi lần đánh giá phải lưu:
+Each evaluation must be saved:
 
 - Input request.
-- Snapshot dữ liệu đã sử dụng.
+- Used data snapshot.
 - Feature vector.
 - Model/rules version.
-- Kết quả từng thành phần.
-- Quyết định cuối.
-- Lý do.
-- Kết quả fulfillment thực tế.
-- Kết quả giao hàng thực tế.
+- Result per component.
+- Final decision.
+- Reason.
+- Actual fulfillment result.
+- Actual delivery result.
 
-Feedback được dùng để cập nhật nhãn huấn luyện và đánh giá hiệu quả mô hình.
+Feedback used to update training labels and model effectiveness evaluation.
 
 ---
 
-# 8. Thiết kế API
+# 8. Design API
 
 ## 8.1. API Overview
 
-| Method | Endpoint | Mục đích |
+| Method | Endpoint | Purpose |
 |---|---|---|
-| POST | `/v1/promises/evaluate` | Đánh giá khả năng cam kết |
-| GET | `/v1/promises/{promise_id}` | Lấy kết quả đánh giá |
-| POST | `/v1/promises/{promise_id}/confirm` | Xác nhận sử dụng lời hứa |
-| POST | `/v1/promises/{promise_id}/feedback` | Gửi kết quả thực tế |
-| GET | `/v1/availability` | Tra cứu khả năng có hàng |
-| GET | `/v1/models/versions` | Xem phiên bản mô hình |
+| POST | `/v1/promises/evaluate` | Commitment assessment |
+| GET | `/v1/promises/{promise_id}` | Obtain evaluation results |
+| POST | `/v1/promises/{promise_id}/confirm` | Confirm commitment usage |
+| POST | `/v1/promises/{promise_id}/feedback` | Send actual results |
+| GET | `/v1/availability` | Query capability for inventory |
+| GET | `/v1/models/versions` | View model version |
 | GET | `/v1/health` | Health check |
 
-Trong MVP có thể triển khai trước ba API chính: evaluate, confirm và feedback. Các API còn lại có thể bổ sung theo nhu cầu tích hợp.
+In the MVP, the following three APIs can be deployed first: evaluate, confirm, and feedback. The remaining APIs can be added as needed.
 
 ## 8.2. POST /v1/promises/evaluate
 
-**Mục đích:** đánh giá khả năng đáp ứng một yêu cầu và trả về phương án cam kết.
+**Purpose:** Evaluate the capability to meet a requirement and return a commitment plan.
 
 Request:
 
@@ -935,29 +935,29 @@ Response:
 }
 ```
 
-Lưu ý: `promise_success_probability` trong ví dụ được tính bằng `0.97 × 0.98 = 0.9506`, theo giả định độc lập.
+Note: `promise_success_probability` in this example is calculated as `0.97 × 0.98 = 0.9506`, assuming independence.
 
-### Các giá trị Decision
+### Decision values
 
-| Value | Ý nghĩa |
+| Value | Meaning |
 |---|---|
-| PROMISE | Có thể cam kết |
-| VERIFY | Cần kiểm tra thêm |
-| REJECT | Không thể cam kết |
+| PROMISE | Committable |
+| VERIFY | Requires additional checks |
+| REJECT | Not committable |
 
-### Các giá trị Risk Band
+### Risk Band values
 
-| Value | Ý nghĩa |
+| Value | Meaning |
 |---|---|
-| HIGH | Rủi ro thấp |
-| MEDIUM | Cần thận trọng |
-| LOW | Rủi ro cao |
+| HIGH | Low risk |
+| MEDIUM | Caution required |
+| LOW | High risk |
 
-Tên `risk_band` cần được hiểu nhất quán: HIGH ở đây là mức độ tin cậy cao, không phải rủi ro cao. Nếu muốn tránh nhầm lẫn, nên đổi thành `confidence_band`.
+The name `risk_band` should be consistently understood: HIGH here refers to high confidence, not high risk. To avoid confusion, it should be changed to `confidence_band`.
 
 ## 8.3. GET /v1/promises/{promise_id}
 
-Lấy lại kết quả đánh giá đã lưu.
+Retrieve saved evaluation results.
 
 Response:
 
@@ -972,11 +972,11 @@ Response:
 }
 ```
 
-API này nên trả về kết quả lịch sử tại thời điểm evaluate, không tự động tính lại bằng model mới.
+This API should return historical results at the time of evaluate, not recompute using a new model.
 
 ## 8.4. POST /v1/promises/{promise_id}/confirm
 
-**Mục đích:** xác nhận rằng hệ thống bán hàng hoặc người dùng đã sử dụng phương án cam kết.
+**Purpose:** Confirm that the sales system or user has adopted the commitment plan.
 
 Request:
 
@@ -998,11 +998,11 @@ Response:
 }
 ```
 
-Đây là bước ghi nhận quyết định nghiệp vụ, không phải lệnh ghi tồn kho vào ERP/WMS.
+This is a business decision recording step, not an inventory reservation command in ERP/WMS.
 
 ## 8.5. POST /v1/promises/{promise_id}/feedback
 
-**Mục đích:** ghi nhận kết quả thực tế để đánh giá độ chính xác và huấn luyện mô hình.
+**Purpose:** Record actual results to evaluate accuracy and train the model.
 
 Request:
 
@@ -1041,13 +1041,13 @@ Response:
 }
 ```
 
-Nhãn `inventory_accurate` cần được tính theo tolerance đã cấu hình. Không nên mặc định mọi sai lệch một đơn vị đều được xem là chính xác.
+Label `inventory_accurate` should be calculated based on the configured tolerance. Do not consider any unit deviation as accurate by default.
 
 ## 8.6. GET /v1/availability
 
-**Mục đích:** cung cấp thông tin availability cho các hệ thống frontend hoặc POS.
+**Purpose:** Provide availability information for frontend or POS systems.
 
-Ví dụ:
+Example:
 
 ```http
 GET /v1/availability?product_id=SKU-001&location_id=STORE-001&quantity=2
@@ -1067,26 +1067,26 @@ Response:
 }
 ```
 
-API availability chỉ thể hiện tình trạng có hàng. Nếu cần ngày giao và khả năng thực hiện lời hứa, frontend phải sử dụng Promise Evaluate.
+API availability only indicates the presence of stock. If the delivery date and the ability to fulfill the promise are required, the frontend must use Promise Evaluate.
 
 ## 8.7. API Error Handling
 
-Chuẩn hóa các lỗi:
+Standardize errors:
 
-| HTTP Status | Error Code | Ý nghĩa |
+| HTTP Status | Error Code | Meaning |
 |---|---|---|
-| 400 | INVALID_REQUEST | Request không hợp lệ |
-| 401 | UNAUTHORIZED | Chưa xác thực |
-| 403 | FORBIDDEN | Không có quyền |
-| 404 | PRODUCT_NOT_FOUND | Không tìm thấy sản phẩm |
-| 404 | LOCATION_NOT_FOUND | Không tìm thấy địa điểm |
-| 409 | DUPLICATE_REQUEST | Request trùng lặp không hợp lệ |
-| 422 | DATA_NOT_READY | Dữ liệu chưa đủ để đánh giá |
-| 429 | RATE_LIMITED | Vượt giới hạn gọi API |
-| 500 | INTERNAL_ERROR | Lỗi nội bộ |
-| 503 | SOURCE_UNAVAILABLE | Hệ thống nguồn không khả dụng |
+| 400 | INVALID_REQUEST | Invalid request |
+| 401 | UNAUTHORIZED | Unauthenticated |
+| 403 | FORBIDDEN | Insufficient permissions |
+| 404 | PRODUCT_NOT_FOUND | Product not found |
+| 404 | LOCATION_NOT_FOUND | Location not found |
+| 409 | DUPLICATE_REQUEST | Invalid duplicate request |
+| 422 | DATA_NOT_READY | Insufficient data to evaluate |
+| 429 | RATE_LIMITED | API call limit exceeded |
+| 500 | INTERNAL_ERROR | Internal error |
+| 503 | SOURCE_UNAVAILABLE | Unavailable source system |
 
-Ví dụ:
+Example:
 
 ```json
 {
@@ -1104,25 +1104,25 @@ Ví dụ:
 
 ## 8.8. API Non-functional Requirements
 
-| Yêu cầu | Mục tiêu MVP |
+| Requirement | MVP Goal |
 |---|---|
 | API latency | p95 < 500 ms |
-| Availability | Theo SLA nội bộ của pilot |
+| Availability | Internal SLA of the pilot |
 | Authentication | OAuth2 / OIDC |
 | Authorization | Role-based access |
-| Idempotency | Hỗ trợ request idempotency |
+| Idempotency | Support request idempotency |
 | Observability | Logs, metrics, traces |
 | Versioning | `/v1/` |
-| Audit | Lưu decision và model version |
-| Data privacy | Không sử dụng dữ liệu cá nhân khách hàng trong MVP |
+| Audit | Store decision and model version |
+| Data privacy | Do not use customer personal data in MVP |
 
-Các ngưỡng hiệu năng cần được kiểm chứng bằng tải thực tế và phụ thuộc vào số lượng location, cách truy vấn và việc sử dụng cache.
+Performance thresholds must be validated through real load testing and depend on the number of locations, query patterns, and cache usage.
 
 ---
 
-# 9. Data Model và lưu trữ
+# 9. Data Model and Storage
 
-## 9.1. Các bảng chính
+## 9.1. Core Tables
 
 ```mermaid
 erDiagram
@@ -1194,51 +1194,51 @@ erDiagram
     }
 ```
 
-## 9.2. Công nghệ lưu trữ tham khảo
+## 9.2. Storage Technology References
 
-| Thành phần | Công nghệ |
+| Component | Technology |
 |---|---|
 | Operational database | PostgreSQL |
 | Cache | Redis |
 | Event streaming | Kafka-compatible event bus |
 | Raw historical data | Object Storage |
-| Search / diagnostics | OpenSearch, nếu cần |
+| Search / diagnostics | OpenSearch, if needed |
 | ML artifacts | Object Storage + Model Registry |
 
-Không nhất thiết phải triển khai tất cả trong MVP. PostgreSQL, object storage và một event bus phù hợp có thể đáp ứng phần lớn nhu cầu ban đầu.
+Not all components need to be implemented in MVP. PostgreSQL, object storage, and a suitable event bus can meet most initial requirements.
 
 ---
 
-# 10. Đánh giá và giám sát mô hình
+# 10. Evaluate and monitor the model
 
 ## 10.1. Model Evaluation Metrics
 
-| Mô hình | Metric | Mục tiêu đánh giá |
+| Model | Metric | Evaluation goals |
 |---|---|---|
-| Inventory Confidence | Brier Score | Độ chính xác xác suất |
-| Inventory Confidence | Precision / Recall | Phát hiện số tồn kho không đáng tin |
-| Fulfillment | Precision / Recall | Dự báo khả năng đáp ứng |
-| Delivery | Brier Score | Calibration xác suất giao đúng hạn |
-| Delivery | AUC / PR-AUC | Khả năng phân biệt đúng hạn và trễ |
-| Promise Engine | Promise Accuracy | Tỷ lệ lời hứa thành công |
-| Promise Engine | Promise Coverage | Tỷ lệ yêu cầu được cam kết |
+| Inventory Confidence | Brier Score | Probability accuracy |
+| Inventory Confidence | Precision / Recall | False inventory detection |
+| Fulfillment | Precision / Recall | Demand fulfillment forecast |
+| Delivery | Brier Score | On-time delivery probability calibration |
+| Delivery | AUC / PR-AUC | On-time vs. delayed distinction capability |
+| Promise Engine | Promise Accuracy | Success promise rate |
+| Promise Engine | Promise Coverage | Committed request rate |
 
-Không đánh giá mô hình chỉ bằng Accuracy. Trong bối cảnh Promise Engine, xác suất được calibration và mức độ kiểm soát false promise quan trọng hơn.
+Do not evaluate the model only by Accuracy. In the context of Promise Engine, the probability calibration and the level of control over false promises are more important.
 
 ## 10.2. Business KPIs
 
-| KPI | Công thức / Ý nghĩa |
+| KPI | Formula / Meaning |
 |---|---|
-| Inventory Accuracy | Tỷ lệ bản ghi tồn kho nằm trong tolerance |
-| Fulfillment Success Rate | Tỷ lệ đơn đáp ứng đủ số lượng |
-| Promise Accuracy | Tỷ lệ lời hứa thực hiện thành công |
-| On-time Delivery | Tỷ lệ giao đúng hạn |
-| Promise Coverage | Tỷ lệ request được cam kết |
-| Manual Verification Rate | Tỷ lệ yêu cầu cần kiểm tra thủ công |
-| Brier Score | Độ chính xác xác suất dự báo |
-| API Response Time | Thời gian phản hồi API |
+| Inventory Accuracy | Inventory record rate within tolerance |
+| Fulfillment Success Rate | Sufficient quantity order rate |
+| Promise Accuracy | Successful promise execution rate |
+| On-time Delivery | On-time delivery rate |
+| Promise Coverage | Committed request rate |
+| Manual Verification Rate | Manual check required request rate |
+| Brier Score | Predicted probability accuracy |
+| API Response Time | API response time |
 
-Cần báo cáo KPI theo:
+Report KPIs by:
 
 - Product category.
 - Store / DC.
@@ -1248,85 +1248,85 @@ Cần báo cáo KPI theo:
 - Requested quantity.
 - Model version.
 
-## 10.3. Monitoring và Alerting
+## 10.3. Monitoring and Alerting
 
-Theo dõi các vấn đề:
+Monitoring issues:
 
-- Inventory data freshness giảm.
-- Event processing lag tăng.
-- Tỷ lệ inventory discrepancy tăng.
-- Promise accuracy giảm.
+- Inventory data freshness decreases.
+- Event processing lag increases.
+- Inventory discrepancy rate increases.
+- Promise accuracy decreases.
 - Calibration drift.
-- Tỷ lệ request bị VERIFY tăng bất thường.
-- Model inference latency tăng.
-- Source system mất kết nối.
+- Abnormal increase in VERIFY requests rate.
+- Model inference latency increases.
+- Source system connection loss.
 
-Khi phát hiện model drift hoặc dữ liệu đầu vào bất thường, hệ thống cần có khả năng chuyển về Rules Baseline.
+When model drift or abnormal input data is detected, the system must be able to switch to Rules Baseline.
 
 ---
 
-# 11. Kế hoạch triển khai MVP 12 tuần
+# 11. MVP Deployment Plan (12 weeks)
 
-| Giai đoạn | Tuần | Công việc | Deliverables |
+| Stage | Week | Work | Deliverables |
 |---|---:|---|---|
-| Data Foundation | 1–2 | Kết nối ERP/POS/WMS, canonical schema, snapshot và event | Unified Inventory |
+| Data Foundation | 1–2 | ERP/POS/WMS integration, canonical schema, snapshot and event | Unified Inventory |
 | Inventory Intelligence | 3–4 | Inventory rules, discrepancy, confidence, ATP | Inventory Assessment |
 | Rules-based Promise | 5–6 | Promise API, delivery rules, decision logic | Promise Engine v1 |
-| ML Enhancement | 7–8 | Chuẩn bị labels, train baseline, calibration | ML models v1 |
-| Pilot | 9–10 | Tích hợp frontend, feedback, vận hành thử | Pilot Release |
-| Evaluation | 11–12 | Đo KPI, đánh giá model, tối ưu và rollback test | MVP Evaluation Report |
+| ML Enhancement | 7–8 | Label preparation, baseline training, calibration | ML models v1 |
+| Pilot | 9–10 | Frontend integration, feedback, trial operation | Pilot Release |
+| Evaluation | 11–12 | KPI measurement, model evaluation, optimization and rollback test | MVP Evaluation Report |
 
-## 11.1. Điều kiện hoàn thành MVP
+## 11.1. MVP Completion Conditions
 
-- Chuẩn hóa được dữ liệu sản phẩm và location.
-- Nhận và xử lý được inventory snapshot/event.
-- Có Inventory Confidence Rules.
-- Tính được ATP.
-- Có Delivery Prediction baseline.
-- Có Promise Evaluate API.
-- Lưu được Promise Decision Log.
-- Ghi nhận được feedback và actual outcome.
-- Có dashboard KPI.
-- Có khả năng fallback từ ML về Rules.
+- Product and location data standardization.
+- Inventory snapshot/event reception and processing.
+- Inventory Confidence Rules.
+- ATP calculation.
+- Has Delivery Prediction baseline.
+- Has Promise Evaluate API.
+- Stores Promise Decision Log.
+- Records feedback and actual outcome.
+- Has KPI dashboard.
+- Can fallback from ML to Rules.
 
-ML không phải điều kiện bắt buộc để MVP được xem là hoàn thành. Nếu dữ liệu huấn luyện chưa đủ, cần ưu tiên vận hành ổn định bằng rules.
+ML is not a mandatory condition for MVP completion. If training data is insufficient, prioritize operational stability using rules.
 
 ---
 
-# 12. Các quyết định kỹ thuật cần thống nhất
+# 12. Technical decisions need to be consistent
 
-Trước khi bắt đầu implementation, cần chốt các vấn đề sau:
+Before starting implementation, need to finalize the following issues:
 
-| Chủ đề | Câu hỏi cần quyết định |
+| Topic | Decisions to be made |
 |---|---|
-| Inventory tolerance | Sai lệch bao nhiêu được coi là tồn kho chính xác? |
-| Confidence thresholds | Ngưỡng HIGH / MEDIUM / LOW là bao nhiêu? |
-| Safety buffer | Công thức và hệ số theo từng nhóm sản phẩm? |
-| Inbound stock | Điều kiện nào cho phép tính hàng đang về vào ATP? |
-| Promise SLA | Xác suất tối thiểu để tự động cam kết? |
-| Delivery target | Cam kết theo ngày hay theo khung giờ? |
-| Fulfillment policy | Ưu tiên DC, Store hay nguồn gần nhất? |
-| Multi-source | Có cho phép tách đơn từ nhiều địa điểm không? |
-| Feedback | Hệ thống nào là nguồn sự thật cho fulfillment và delivery outcome? |
-| Model governance | Ai phê duyệt model trước khi đưa vào production? |
+| Inventory tolerance | How much deviation is considered accurate inventory? |
+| Confidence thresholds | What is the HIGH / MEDIUM / LOW threshold? |
+| Safety buffer | Formulas and coefficients per product group? |
+| Inbound stock | Under what conditions may inbound units be included in ATP? |
+| Promise SLA | What is the minimum probability for automatic commitment? |
+| Delivery target | Commitment by day or by time window? |
+| Fulfillment policy | Prioritize DC, Store, or nearest source? |
+| Multi-source | Is it allowed to split orders from multiple locations? |
+| Feedback | Which system is the source of truth for fulfillment and delivery outcome? |
+| Model governance | Who approves the model before production? |
 
 ---
 
-# 13. Khuyến nghị triển khai
+# 13. Deployment recommendations
 
 ## Priority 1 – Reliable Promise
 
-Tập trung vào dữ liệu sạch, đồng bộ tồn kho, kiểm soát độ tin cậy và luật ATP. Đây là nền tảng bắt buộc.
+Focus on clean data, synchronized inventory, reliability control, and ATP rules. This is the mandatory foundation.
 
 ## Priority 2 – Predictive Promise
 
-Đưa Inventory Confidence Model và Delivery Prediction Model vào sau khi có đủ dữ liệu kiểm kê và lịch sử giao hàng.
+Deploy the Inventory Confidence Model and Delivery Prediction Model after sufficient inventory counts and delivery history are available.
 
 ## Priority 3 – Optimized Promise
 
-Bổ sung tối ưu hóa nhiều nguồn cung, chi phí fulfillment và năng lực vận hành khi hệ thống đã ổn định.
+Optimize multiple supply sources, fulfillment costs, and operational capacity once the system is stable.
 
-**Đề xuất quan trọng:** Không nên bắt đầu bằng việc xây dựng một mô hình ML phức tạp để dự đoán lời hứa cuối cùng. Nên xây dựng ba lớp xác suất có ý nghĩa nghiệp vụ rõ ràng, đánh giá độc lập từng lớp, sau đó mới tổng hợp thành Promise Decision.
+**Important Recommendation:** Do not start by building a complex ML model to predict the final promise. Instead, build three meaningful business-level probability layers, evaluate each layer independently, and then combine them into a Promise Decision.
 
 > Traditional inventory systems tell us what the system thinks we have. Promise Engine tells us what we can confidently commit to our customers.
 

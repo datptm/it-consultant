@@ -1,12 +1,12 @@
 # Change log
 
 ## 2026-11-05 16:15 (UTC) - Promise Engine CLI PoC
-- Task: Hiện thực PoC Promise Engine rule-based và ML-based với dữ liệu mẫu và CLI.
-- Changes: Thêm dữ liệu nghiệp vụ giả lập; rule tính điểm tồn kho, ATP và ngày giao; ba mô hình logistic regression huấn luyện trong bộ nhớ; engine quyết định theo một nguồn cung và CLI demo/evaluate, trong đó rule mode chạy độc lập với thư viện ML; kiểm thử và hướng dẫn chạy. Khai báo dependency runtime cần thiết trong `requirements.txt` đồng nhất với `pyproject.toml`.
+- Task: Implement PoC Promise Engine rule-based and ML-based with sample data and CLI.
+- Changes: Add synthetic business data; inventory scoring rule, ATP rule, and delivery date rule; three logistic regression models trained in memory; engine decision based on a single source and CLI demo/evaluate, where rule mode runs independently of the ML library; testing and run instructions. Declare required runtime dependencies in `requirements.txt` consistent with `pyproject.toml`.
 - Files: `data/sample.json`, `src/promise_poc/__init__.py`, `src/promise_poc/data.py`, `src/promise_poc/rules.py`, `src/promise_poc/features.py`, `src/promise_poc/ml.py`, `src/promise_poc/engine.py`, `src/promise_poc/__main__.py`, `tests/test_promise.py`, `pyproject.toml`, `requirements.txt`, `.gitignore`, `README.md`, `docs/ai/CHANGELOG.md`
-- Why: Minh họa luồng đánh giá lời hứa cốt lõi từ `docs/resources/methodology.md` bằng dữ liệu nhỏ, không triển khai API hoặc hạ tầng.
-- Verification: Python 3.13 và 3.12: `unittest discover -s tests -v` đều 17/17 qua; `python -m compileall -q src tests` qua; Python 3.13: `demo --mode rules` chạy không cần ML, `demo --mode ml` và `evaluate --mode ml` chạy thành công. `requirements.txt` được kiểm tra khớp chính xác với `project.dependencies` trong `pyproject.toml`. Không chạy lại test cho thay đổi chỉ ở manifest; không chạy lệnh cài editable hoặc linter vì chưa có linter được cấu hình.
-- Risks / follow-ups: Dữ liệu ít và xác suất chưa hiệu chỉnh, chỉ phù hợp minh họa; thư mục dependency cục bộ `.deps` cần môi trường có quyền đọc thích hợp hoặc cài lại bằng lệnh trong README.
+- Why: Demonstrate the core evaluation flow from `docs/resources/methodology.md` using small data, without deploying API or infrastructure.
+- Verification: On Python 3.13 and 3.12, `unittest discover -s tests -v` passed 17/17 and `python -m compileall -q src tests` passed. On Python 3.13, `demo --mode rules` ran without ML, and `demo --mode ml` and `evaluate --mode ml` succeeded. `requirements.txt` was checked against `project.dependencies` in `pyproject.toml`. Tests were not rerun for the manifest-only change; the editable install and linter were not run because no linter was configured yet.
+- Risks / follow-ups: Data is limited and probabilities are not calibrated, only suitable for demonstration; local dependency directory `.deps` requires appropriate read permissions or reinstallation via the command in README.
 
 ## 2026-11-08 12:57 (UTC) - Streamlit UI and saved ML models
 - Task: Add a Streamlit web UI with sample, evaluation, and ML training tabs, plus Ruff and documentation.
