@@ -1,356 +1,183 @@
-# Promise Hub: ideas, methodology, and MVP implementation approach
+﻿# Promise Hub — Product Description
 
-**IT Consultant Challenge 2026 · Round 1 · Company A (Danish building materials retailer)**
+**Status:** Proposed retail product, supported by a local Promise Engine proof of concept (PoC)
 
-> *"Inventory doesn't sell. Customers buy the promise we keep."*
+**Intended organization:** Company A, a building materials retailer operating in Denmark, Norway, and Sweden
 
-> **Note:** All figures in this document (store counts, baselines, KPIs, labor costs, etc.) are **the team's assumptions** for illustration and must be measured and confirmed in the MVP's first week.
+**Primary user:** Store staff handling customer requests for a specific quantity and pickup date
 
----
+## Product overview
 
-## 1. Executive summary
+Promise Hub is a proposed shared service for answering a practical retail question: can a requested quantity of a product be supplied to a chosen store by a particular date, and how dependable is that answer? It would bring product, inventory, and route information from existing country systems into a common view. Its central component, the Promise Engine, evaluates eligible supply sources before recommending whether staff can make a commitment, should verify the information, or should decline the requested date or quantity.
 
-| Content | Summary |
-|---|---|
-| **Chosen problem** | Fragmented systems: each country answers "Do we have it in stock? When can it be delivered?" differently, and no one fully trusts the answer. |
-| **Core perspective** | Fragmentation is the **root cause** of the three remaining challenges (manual, inconsistent operations, unreliable delivery). |
-| **Solution** | **Promise Hub**: a shared data layer and integration built on existing systems (ERP, POS, WMS), providing product information, inventory, and delivery date **with reliability**. |
-| **Differentiator** | Rather than hiding inventory inaccuracies, **measure and act on them**: each answer has a confidence level so staff know when to promise and when to verify. |
-| **MVP** | 12 weeks, pilot in Sweden, around 15 stores and 1 distribution center, only read data, no ERP replacement. |
-| **Scale** | Shared core, adapters and country-specific configurations; each country has a "first win" different from the same platform. |
+The product is intended to support store conversations, particularly with contractors whose work depends on materials being available when expected. A store employee should be able to identify a product, enter the quantity and pickup store, and receive a decision with the selected source, available-to-promise quantity, earliest feasible date, and reasons for the decision. Inventory uncertainty is visible so staff can act on it instead of treating every stock figure as equally dependable.
 
----
+This repository contains a **local, synthetic-data PoC** of the decision engine, a command-line interface, and a Streamlit demonstration. It does not connect to Company A's operational systems or make real customer commitments. The wider product and pilot described below are proposals, not deployed capabilities.
 
-## 2. Context and problem
+## Problem and objectives
 
-Company A is a leading Danish building materials retailer with hundreds of stores across Denmark, Norway, and Sweden, serving both businesses (B2B) and consumers (B2C). According to the challenge brief:
+Company A's country and regional operations use different systems and procedures. Product and stock records can be inconsistent, updated at different times, or interpreted differently by staff. When a customer asks for a specific quantity on a specific date, an apparent “in stock” value may still be unusable: units may be reserved, the record may be stale, or the supply route may be too slow. Employees then contact stores or distribution centers to confirm availability, delaying the answer and creating inconsistent commitments.
 
-- Each country and region has developed its own systems and manual processes.
-- Four related challenges: **manual processes, inconsistent operations, delivery and order handling, and fragmented systems**.
-- Urgency differs by country (the brief says these issues *may* be especially relevant): Denmark leans toward manual processes, Norway toward store operations, and Sweden toward delivery.
-- Management only wants to invest in **one** digital solution, but cannot implement it identically across the three countries.
-- Highly competitive market, time to market is the key factor.
+Promise Hub aims to provide a common decision process across countries while allowing local systems and fulfillment rules to differ. The initial outcome is a faster, more explainable pickup decision at the counter. The objectives are to:
 
-**Core question:** *Which area should Company A focus on first?*
+- Show staff which eligible source could supply the request and when.
+- Distinguish usable stock from raw on-hand stock by considering reservations, allocations, and uncertainty.
+- Apply consistent stock and date checks before making a probability-based recommendation.
+- Identify requests that require manual checking and explain what needs attention.
+- Measure decision quality and operational outcomes before expanding beyond a pilot.
 
----
+## Users and use cases
 
-## 3. Identify the issue (Identify)
-
-### 3.1. The problem is a loss of trust in answers
-
-Saying that each country uses different systems only describes the surface. At a specific moment, store staff cannot answer confidently and quickly: **What is this product, what does it cost, where is it available, and when can it be delivered?**
-
-### 3.2. Cause and effect chain
-
-```
-Each country builds its own systems (history, acquisitions, local needs)
-   → Product, price, and inventory data diverge and fall out of sync
-      → Staff call, use spreadsheets, and reconcile manually (= manual processes)
-      → Stores give customers different answers          (= inconsistent operations)
-      → Wrong delivery promises and late deliveries       (= unreliable delivery)
-         → Every improvement must be repeated three times and is hard to scale
-```
-
-The other three challenges are largely **symptoms**; fragmentation is the **root cause**.
-
-### 3.3. Industry context supporting the argument
-
-- Nordic countries have industry-specific product data standards (**NOBB** in Norway, **FINFO** in Sweden, **Byggebasen** in Denmark), so product data is not self-consistent across countries.
-- Mergers and acquisitions are consolidating the Nordic building materials industry and are likely to contribute to fragmentation. Competitors' rapid growth increases the cost of delays.
-- ERP systems are generally not designed to serve as a digital channel's product data source, so fragmentation becomes most visible when data must reach stores, the web, and B2B customers.
-
-### 3.4. Who is affected
-
-| Group | Pain point |
-|---|---|
-| Counter/cashier staff | Uncertain stock availability; must contact another store or warehouse, each country has a different interface |
-| B2B customers (contractors, craftsmen) | Need to be certain of stock availability and delivery date to avoid project delays; incorrect delivery schedule results in lost customers |
-| Individual customers (DIY) | Website shows stock available but store is out of stock |
-| Order fulfillment and warehouse management | Planning based on delayed or incorrect data |
-| Product data management | Introducing a new product to three markets requires multiple entries and standardization steps |
-| Executive Board, IT Group | No consolidated data; each improvement must be redone for each country |
-
-**Primary MVP persona:** a counter employee serving B2B customers (contractors).
-
-**Illustrative scenario (hypothetical):** At 7 a.m., a contractor needs 60 sheets of drywall delivered by Thursday. The counter system says "in stock." The employee calls other stores and warehouses, makes three calls, spends 40 minutes, and promises Thursday. The goods actually arrive on Friday, stopping the project for a day.
-
----
-
-## 4. Prioritization
-
-### 4.1. Scoring Matrix
-
-Score each option from 1 to 5 (subjective judgment based on the brief):
-
-| Criteria (weight) | Manual | Store operations | Delivery | **Fragmentation** |
-|---|---|---|---|---|
-| Impact across three countries (25%) | 3 | 3 | 3 | **5** |
-| Root cause and foundation (20%) | 2 | 3 | 2 | **5** |
-| Speed to Value with MVP (20%) | 4 | 2 | 3 | 3 |
-| Feasibility, Risk (15%) | 4 | 2 | 3 | 3 |
-| Measurable ROI (10%) | 4 | 2 | 4 | 4 |
-| AI potential (10%) | 4 | 3 | 4 | 4 |
-| **Weighted score** | 3,35 | 2,55 | 3,00 | **4,10** |
-
-### 4.2. Why Not Choose the Remaining Three Issues
-
-- **Manual Process:** Can deliver results quickly, but automation on data is not reliable and tends to cause more errors.
-- **Shipping and Order Processing:** Delivery promises depend on having reliable inventory data beforehand.
-- **Store Operations:** To standardize workflows, consistent data and tools must be in place first.
-
-### 4.3. Acknowledged Trade-offs
-
-A "big bang" attempt to integrate every system would be slow and risky. The MVP therefore uses a **thin layer over existing systems, without replacing the ERP**.
-
----
-
-## 5. Solution: Promise Hub
-
-### 5.1. Five-layer architecture
-
-| Layer | Component |
-|---|---|
-| **Experience** | Store Assistant App (web/tablet), B2B portal and website status widgets, management dashboard |
-| **Shared Services** | Product Master, Unified Inventory, **Promise Engine** (ATP with reliability), Search |
-| **Standard Data Model** | Product (mapping NOBB/FINFO/Byggebasen), Price, Stock, Delivery Promise |
-| Integration | API gateway, event streaming, **country-specific adapter** |
-| **Data source** | ERP, POS, WMS, TMS, supplier feed, e-commerce |
-
-### 5.2. Design principles
-
-1. **Strangler approach:** do not replace the old system, wrap and read data through the adapter; initial phase is read-only to reduce risk.
-2. **Shared core, country-specific adapters:** aligns with the requirement "a strategic solution does not mean identical implementation."
-3. **API first; favor configuration and ready-made components over custom development** to reduce time to market.
-4. **Data sovereignty:** infrastructure located in EU, GDPR compliance, audit logs. This aligns with the organizers' "developing for Europe, by Europe" direction.
-
----
-
-## 6. Core feature: a reliable promise
-
-### 6.1. Concept
-
-Inventory data **always has some uncertainty**. Instead of displaying a number as certain, Promise Hub shows it **with a confidence score** and the last verification time. Example staff screen:
-
-```
-13 mm moisture-resistant plasterboard (product code harmonized across NOBB/FINFO/Byggebasen)
-Store: 40 sheets · Confidence 92% · Last checked 2 hours ago
-Distribution center: 1,200 sheets · Confidence 97%
-Delivery: Thursday · On-time probability 90%
-[Promise to customer]   [Verify inventory]   [Report discrepancy]
-```
-
-### 6.2. Reliability score calculation
-
-**Input (signal):**
-- Time since last inventory check,
-- Item throughput rate (faster rotation items are more error-prone),
-- Historical error rates by item and location,
-- Number of unsynchronized transactions,
-- Source system latency,
-- Product type (discrete, small items, bulky items).
-
-**Action bands:**
-
-| Band | Meaning | Suggested action |
+| User | Need | Intended support |
 |---|---|---|
-| 🟢 High | Reliable | Promise immediately |
-| 🟡 Medium | Needs checking | Scan or count quickly before promising |
-| 🔴 Low | Unreliable | Do not promise; suggest another store, warehouse, or a more conservative delivery date |
+| Counter or sales employee | Answer a customer request for a product, quantity, pickup store, and date during a conversation. | Enter the request and see a decision with supporting details. |
+| Store manager | Understand recurring inventory discrepancies and how often staff need to verify stock. | Proposed discrepancy reporting and pilot performance views. |
+| Inventory or fulfillment coordinator | Identify whether a store or distribution center can supply the request. | See the selected source, available-to-promise quantity, route feasibility, and reason codes. |
+| Product and data team | Improve product mapping, data freshness, and decision rules. | Proposed data quality measures and review of actual outcomes. |
 
-**Cold start:**
-- Weeks 1 to 6: score according to **rules** (e.g., deduct points based on days since last inventory check, unsynchronized transactions, historical discrepancies).
-- From week 7: move to an **ML model** trained on historical inventory adjustments and periodic ERP count logs.
-- **Calibration:** compare predicted probability with actual inventory check results (calibration curve, Brier score), to ensure "92%" truly means approximately 92% accurate.
+The initial workflow is **store pickup**. A store may fulfill a request from its own stock, or a distribution center may supply that store over an eligible route. Customer-address delivery, split fulfillment, payment, reservation, and order creation are outside the current PoC.
 
-### 6.3. Feedback loop (data flywheel)
+### Typical staff workflow
 
-Each time an employee clicks "Confirm" or "Incorrect," that feedback is recorded and becomes a training label. Staff become **data quality sensors**, supporting adoption of the change.
+1. Select the product, requested quantity, pickup store, and desired pickup date.
+2. The engine finds eligible single-source routes and the latest inventory snapshot available at the request time for each source.
+3. It excludes sources with stale stock data, too little available stock, or an earliest arrival after the requested date.
+4. It assesses inventory reliability and estimates fulfillment and on-time performance for the remaining sources.
+5. It selects a source and returns **PROMISE**, **VERIFY**, or **REJECT**, with dates, quantity, measures, and reasons.
+6. If the result is **VERIFY**, staff check the underlying stock or route information before making a commitment. The PoC does not record that verification or automatically revise its decision.
 
----
+The result is decision support, not a reservation. A production workflow would need an explicit handoff to order and inventory systems before a commitment could be secured.
 
-## 7. AI's Role
+## Functional capabilities
 
-AI is used selectively, with the right technique for the right task:
-
-| Function | Technique | Stage | Reason |
-|---|---|---|---|
-| Delivery Date | Rule + ML | MVP | Fixed constraints plus learning delay from history |
-| Confidence scoring | Classical ML | MVP (rules first, ML later) | Needs calibrated probabilities at low cost |
-| Abnormal inventory detection | Classic ML | MVP-lite | Pattern recognition on structured data |
-| Product data harmonization (attribute mapping, duplicates, Danish/Norwegian/Swedish text) | Generative AI with human review | MVP | Unstructured text and many variants |
-| Draft integration mappings and tests | Generative AI with developer review | MVP (during development) | Reduce the time and cost of each adapter when scaling |
-| Natural language search in three languages | Generative AI, embeddings | MVP lite or Phase 2 | Staff can describe products without remembering codes |
-| Demand forecasting and improved delivery date prediction | ML | Phase 2 | Requires clean Hub data first |
-
-**Guardrails:** Keep models and data in the EU; use confidence thresholds and human review; retain full audit logs. The proposed uses appear low risk under the EU AI Act, but this must be checked before deployment. Also account for AI operating costs (tokens and quality evaluation).
-
----
-
-## 8. Implementation of MVP
-
-### 8.1. Hypotheses to verify
-
-> *If B2B employees and customers have a single source of truth for products, inventory, and delivery dates with confidence, then the time to lookup, number of control calls, and error rate in promised deliveries will decrease significantly.*
-
-### 8.2. Scope
-
-| Within scope | Outside scope |
-|---|---|
-| 1 ERP adapter and 1 POS/WMS adapter at the pilot country (read-only) | ERP replacement |
-| Standard data model for popular SKUs (assumed 10,000 to 20,000 SKUs) | Pricing, finance, HR |
-| AI-assisted product data harmonization | Rebuild entire e-commerce |
-| Unified inventory and Promise Engine for approximately 15 stores and 1 distribution center | Write-back all order types |
-| Store Assistant App: search; nearby store and warehouse inventory; estimated delivery dates; data error reporting | Cross-border logistics, advanced forecasting |
-| Dashboard KPI | |
-
-**Why Sweden for the pilot (hypothetical):** The brief identifies delivery and order handling as major pain points there, so the value of a reliable delivery date should become clear quickly. Denmark is an alternative pilot location because it is the home market and may be easier to coordinate.
-
-### 8.3. 12-Week Plan
-
-| Week | Main activities | Handover results |
+| Capability | Intended product behavior | Current PoC status |
 |---|---|---|
-| **1–2 Discovery** | Interview staff and coordinators; select pilot and comparison stores; audit data (SKU duplicates, sampled inventory accuracy); establish baseline KPIs; obtain API access; review security and GDPR | Baseline report, priority SKU list, integration plan |
-| **3–4 Foundations** | Canonical data model v1; read-only ERP adapter; event pipeline; product harmonization with a human review queue | Unified product and inventory data for priority SKUs |
-| **5–6 Core features** | Unified Inventory; rules-based Promise Engine; Store Assistant alpha; test with two stores | Working demo with real data |
-| **7–8 Refinement** | Inventory confidence ML model v1; feedback button; KPI dashboard; performance and security tests | Pilot-ready release |
-| **9–10 Pilot** | Deploy to approximately 15 stores and one DC; train staff; assign a champion at each store; hold daily stand-ups for feedback | Real usage data |
-| **11–12 Measure and decide** | Compare pilot stores with similar control stores; summarize findings; make a go/no-go decision; plan the next phase | Results report and expansion recommendation |
+| Product and location selection | Use consistent product and location identifiers across channels and countries. | Fixed synthetic catalog of 30 products, 10 pickup stores, and three distribution centers. |
+| Inventory view | Combine source records and expose their freshness and reliability. | Reads local snapshots and calculates inventory confidence; no live feeds. |
+| Available-to-promise (ATP) | Show quantity that can be offered after existing commitments and a safety buffer. | Calculates ATP for each candidate source; inbound stock is excluded. |
+| Pickup-date evaluation | Check whether an eligible route can reach the pickup store by the requested date. | Uses route cutoffs, processing days, and transit business days for store pickup. |
+| Promise decision | Recommend a commitment, verification, or rejection with reasons. | Implements PROMISE, VERIFY, and REJECT in Rules and ML modes. |
+| Staff experience | Make the answer quick to read and explain at the counter. | Streamlit tabs show sample scenarios and permit manual request evaluation. |
+| Feedback and monitoring | Record checks, actual picks, arrivals, and decision outcomes. | Synthetic historical outcomes are available for exploration; no live feedback or decision log. |
+| Operational integration | Read existing ERP, POS, and warehouse systems through country adapters. | Proposed only; the PoC reads local files. |
 
-### 8.4. Suggested team (approximately eight people)
+### Decision meanings
 
-Product owner, architect, three integration/backend engineers, one data/AI engineer, one UX/frontend engineer, and one QA specialist.
+- **PROMISE:** The selected source passes the hard feasibility checks and the current confidence and success thresholds. The result includes the requested date as the promised pickup date.
+- **VERIFY:** A source is feasible, but the evidence does not meet the threshold for an automatic promise. Staff should confirm relevant stock or route information before committing.
+- **REJECT:** No eligible single source can meet the request, or the confidence or success measure is below the rejection threshold. No promised pickup date is returned.
 
-### 8.5. Measuring effectiveness
+These labels describe a recommendation. They do not indicate that an order was placed, stock was reserved, or a customer was notified.
 
-- Measure **baseline at week 1** before intervention.
-- Use a **control store** with similar scale and characteristics to isolate the impact of MVP from seasonal factors.
-- Track outcome metrics (on-time performance, time saved) and adoption metrics (the share of staff using the tool weekly).
+## Promise Engine decision process
 
-### 8.6. Stop or go criteria (go/no-go)
+A request contains a product ID, positive integer quantity, pickup location, desired date, delivery type, and request time. The PoC accepts a known product and location, the supported store-pickup type, and a date on or after the request date. It evaluates eligible sources independently, then selects one result.
 
-| Criteria | Threshold |
+### Inventory reliability and available stock
+
+Inventory confidence describes how closely a stock record is expected to match an actual count. It is distinct from the chance of filling the entire requested order. In Rules mode, the PoC starts with a confidence score of 1.00 and reduces it for conditions including an old stock count, pending transactions, historical discrepancies, and high recent sales velocity. A stock snapshot more than 24 hours old is excluded even if its score would otherwise be high. In ML mode, an inventory model supplies the confidence estimate, but the same freshness exclusion applies.
+
+Both modes calculate a conservative safety buffer and ATP:
+
+    safety_buffer = ceil(on_hand × (1 − inventory_confidence) × 0.5)
+    ATP = max(0, on_hand − reserved − allocated − safety_buffer)
+
+The source is excluded when ATP is below the requested quantity. Expected inbound units are not counted as available. A favorable model prediction cannot override a stock shortage.
+
+### Date and fulfillment assessment
+
+For each candidate route, the engine calculates the earliest pickup date from the request time, route cutoff, processing time, and transit time. The current calendar treats Monday through Friday as business days and does not account for public holidays. A source is excluded if its earliest date is later than the desired date.
+
+After the stock and date checks, the engine produces two further measures: whether the full quantity can be picked and whether a fully picked request arrives by the requested date. Rules mode uses fixed illustrative values based on stock margin and date margin. ML mode uses separate logistic regression classifiers trained on synthetic historical picks and deliveries. The engine multiplies the fulfillment and on-time outputs to create an illustrative combined success measure.
+
+These outputs have **not** been calibrated or validated against real operational outcomes. The delivery model is trained only on orders picked in full, so its estimate is conditional on a full pick. The combined measure must not be interpreted as a verified probability that a real customer promise will succeed.
+
+### Decision thresholds and source choice
+
+| Condition after stock and date checks | Decision |
 |---|---|
-| Inventory display accuracy | ≥ 92% |
-| Counter staff using it weekly | ≥ 60% |
-| On-time promise accuracy | 5 percentage points above baseline |
+| Inventory confidence below 0.65, or combined success below 0.85 | REJECT |
+| Inventory confidence at least 0.85 **and** combined success at least 0.95 | PROMISE |
+| Remaining feasible cases | VERIFY |
 
-**If not meeting 2 out of 3 criteria:** pause and adjust before scaling up, do not continue investing based on inertia.
+If no source passes stock, freshness, and date checks, the engine returns REJECT with a no-feasible-single-source reason. When multiple candidates remain, it prioritizes a PROMISE result over VERIFY and REJECT, then compares the combined measure, inventory confidence, earliest date, and source ID. These threshold values are PoC parameters; a real deployment requires validation and an approved operating policy.
 
----
+## Current proof of concept
 
-## 9. Business Impact
+The working PoC runs on a developer machine using local synthetic JSON files. A fixed sample reference time makes demonstrations repeatable. The bundled seven scenarios cover distribution-center supply, store stock, insufficient stock, an infeasible date, a narrow stock margin, low inventory confidence, and stale inventory.
 
-| KPI | Baseline (assumed) | Pilot Goal | Expansion Goal |
-|---|---|---|---|
-| On-time promise accuracy | Measured in week 1 | +5 percentage points | +10 percentage points |
-| Inventory display accuracy | ~85% | ≥ 92% | ≥ 95% |
-| Time spent by staff for inquiry, reconciliation calls | Measured in Week 1 | −40% | −50% |
-| Product Data Standardization Time | 4–6 weeks | ≤ 2 weeks | < 1 week |
-| New Market Integration Time | 12 months or more | Not applicable | < 6 months |
-
-**ROI Example (Illustrative):**
-
-- Cost savings = number of stores × number of users × minutes saved per day × number of days × hourly labor cost.
-- Example: 300 stores × 3 users × 10 minutes/day × 300 days ≈ 45,000 hours/year; at 35 EUR/hour ≈ **1.6 million EUR/year**.
-- Add retained revenue from fewer lost orders caused by uncertainty about stock availability (actual revenue data is needed to calculate this).
-- Add an estimate of MVP investment costs and the payback period, preferably as ranges.
-
----
-
-## 10. Scale
-
-### 10.1. Shared core and customization
-
-| Shared (Global core) | Country-specific (Local) |
+| Streamlit tab | Purpose |
 |---|---|
-| Standard data model, integrated hub, API, security, monitoring | Country-specific ERP/POS/WMS adapters |
-| Promise Engine, UX design, AI model | Product data standards (NOBB, FINFO, Byggebasen), language, currency (SEK, NOK, DKK) |
-| Data governance process | Shipping rules, transport partners, B2B pricing agreements |
-| | Training, change management, labor representative consultation (needs country-specific requirements check) |
+| **Sample scenarios** | Review bundled requests and their Rules or ML decisions. |
+| **Evaluate a request** | Choose a product, quantity, pickup store, date, and mode; evaluate at the fixed reference time. |
+| **ML training** | Train and save three local models, then inspect synthetic-data validation and test summaries. |
+| **Data analytics** | Explore label balance and outcomes by product and source location. |
 
-**Configuration instead of code:** Differences between countries (shipping rules, units, taxes, language) are declared via configuration. Adding a country means adding a configuration package and an adapter.
+The command-line interface can run the sample scenarios or evaluate a supplied request. In CLI ML mode, models are retrained on each invocation. The web interface instead requires a previously trained, compatible local model bundle. Neither interface uploads data, sends requests to operational services, reserves stock, or records a real fulfillment outcome.
 
-### 10.2. One platform, three early wins
+The PoC demonstrates the decision structure and the difference between fixed rules and learned estimates. Its synthetic labels reflect assumptions in the data generator, so apparent model accuracy and business rates cannot establish production performance. Implementation details, feature definitions, and a worked example are in [Data, features, and models](../data-features-models.md); setup instructions are in the [README](../../README.md).
 
-| Country | Pain point from the brief | First value from the Hub |
+## Proposed operating architecture
+
+The intended production product would place a shared decision service over existing country systems. Exact interfaces and infrastructure would be chosen after discovering the retailer's available data and operating constraints.
+
+| Layer | Proposed responsibility |
+|---|---|
+| Staff and channel experience | Store-facing request form and decision display; later, approved status views for other channels. |
+| Promise service | Validate requests, calculate ATP and date feasibility, apply policy, and return traceable reasons. |
+| Shared data model | Map product, location, inventory, route, and outcome records to consistent definitions. |
+| Country adapters | Read local ERP, POS, warehouse, and transport data without requiring identical implementations. |
+| Governance and measurement | Monitor data freshness, actual outcomes, staff verification, and model performance. |
+
+The initial integration concept is read-only. It avoids changing the existing ERP or order process while source data and decision quality are being assessed. A production promise would eventually require a controlled reservation or order handoff, audit records, access controls, and reconciliation with source systems. Those are design requirements, not current PoC features.
+
+Product mapping would need to respect local identifiers and catalog standards such as NOBB, FINFO, and Byggebasen where applicable. The shared core should use common definitions; country adapters and configuration should handle local catalog mappings, language, units, routes, and operating rules. Specific standards and deployment obligations require review with Company A.
+
+## Proposed pilot and rollout
+
+A proposed first pilot focuses on counter staff handling store-pickup requests. Sweden is a candidate because delivery and order handling were identified as a prominent concern in the challenge brief. The planning assumption is approximately 15 stores and one distribution center over 12 weeks. Those numbers are illustrative and depend on usable source data and pilot partners.
+
+| Stage | Proposed work | Exit evidence |
 |---|---|---|
-| **Sweden** (pilot) | Delivery and order handling | Reliable delivery dates |
-| **Norway** (round 2) | Store operations | Store Assistant standardizes the experience at the counter |
-| **Denmark** (third phase) | Manual processes | Automated data standardization and less manual reconciliation |
+| Discovery and baseline | Interview staff, inspect source data, define priority products and routes, and measure current lookup time and promise outcomes. | Agreed scope, baseline, data access, and decision policy. |
+| Data foundation | Map product and location IDs, ingest selected inventory and route data, and assess freshness and quality. | Traceable inputs for pilot products and sources. |
+| Rules and staff workflow | Deploy the rules-based decision path and store-facing view; test verification procedures with staff. | Staff can complete the scoped request flow and understand reasons. |
+| Pilot and evaluation | Observe usage, actual picks, and arrival outcomes; compare with baseline and suitable comparison stores. | Evidence on reliability, adoption, and operational effort. |
+| Expansion decision | Review data quality, errors, cost, and feedback before adding locations or ML. | Explicit decision to improve, extend, or stop the pilot. |
 
-### 10.3. Timeline
+ML is optional for pilot completion. It should be introduced only if historical counts, picks, and arrivals have reliable timestamps and labels, and if the model improves decisions on held-out operational data. Later releases could add discrepancy reporting, feedback capture, additional fulfillment types, more countries, and other customer channels. These remain proposed capabilities.
 
-Phase 0 platform and data cleanup → Phase 1 Sweden (12 weeks) → Phase 2 Norway → Phase 3 Denmark → expand Phase 2 capabilities (ordering, forecasting, B2B portal).
+## Success measures
 
-### 10.4. Deployment constraints
+Pilot success must be assessed against a measured baseline, not synthetic PoC data.
 
-- **Peak construction season** (assumed spring to summer): avoid go-live and training during this period, set a freeze period for changes.
-- **Source data quality:** requires data cleaning in Phase 0.
-- **Performance and latency** when synchronizing near real-time.
-- **Employee acceptance:** use champions at each store.
-
----
-
-## 11. Risks and mitigation
-
-| Risks | Mitigation |
-|---|---|
-| Data ownership dispute between countries | Data ownership by region, data governance council |
-| Scope creep into an ERP replacement project | Signed-off out-of-scope list and go/no-go gates |
-| Employees not using | Design with store employees, champion, track usage ratio |
-| Supplier dependency | Open API, layered architecture |
-| Poor source data | Data cleanup phase; confidence scores **expose** problems instead of concealing them |
-| Lack of historical data for ML training | Kickstart with rules, switch to ML when sufficient data is available |
-
----
-
-## 12. Main Assumptions
-
-1. Each country has at least one ERP and a warehouse system with API or data export mechanism.
-2. Approximately 300 stores (the description refers to 'hundreds').
-3. Sweden has a delivery issue as per the example in the proposal.
-4. The company accepts EU-based cloud infrastructure.
-5. Baseline numbers, KPIs, and ROI are illustrative and confirmed by week 1.
-6. The construction industry peak season is spring to summer.
-
----
-
-## 13. Questions judges may ask and suggested answers
-
-| Question | Response |
-|---|---|
-| Why choose fragmentation over more practical issues like delivery? | Fragmentation is the root and common cause for all three countries; delivery and manual processes require reliable data first. There is a scoring matrix and acknowledgment of trade-offs. |
-| Is this not a multi-year ERP consolidation project? | No. Hub runs on the old system, read-only, 12-week scope, with a stop criteria. |
-| Where will training data for the confidence model come from? | Begin with rules. From week 7, use historical inventory adjustments and counts from the ERP; staff feedback adds labels. |
-| Why not use AI generation for everything? | Each function uses the right technique: delivery date calculation requires rules and ML, while attribute mapping or natural language search is better suited for AI generation. |
-| How do you know the MVP is successful? | KPI baseline measured at week 1, control store, three clear go/no-go criteria. |
-| What differs between the three countries? | Shared core; adapters, data standards, shipping rules, training are specific; each country has a different 'first win'. |
-| Costs and ROI? | State an 8-person team estimate over 12 weeks, compared to illustrated benefits; confirm with pilot data. |
-
----
-
-## 14. Appendix: 10-slide structure
-
-| # | Slide | Role as per the proposal |
+| Measure | What it shows | How to evaluate |
 |---|---|---|
-| 1 | Executive summary | Overview |
-| 2 | Issues and root causes | Identify |
-| 3 | Why prioritize this issue | Prioritise |
-| 4 | Solution architecture | Solve |
-| 5 | Core feature: Reliable promise | Solve |
-| 6 | Where AI is used, where it is not used | AI |
-| 7 | MVP scope, roadmap, stop criteria | Solve |
-| 8 | Business impact | Business impact |
-| 9 | Scale out | Scale |
-| 10 | Risk, assumption, decision proposal | Conclusion |
+| Promise accuracy | Share of commitments fulfilled in full by the agreed date. | Link recorded decisions to actual pick and arrival outcomes. |
+| Inventory accuracy and freshness | Whether shown stock is dependable at decision time. | Compare snapshots with physical counts and record update age. |
+| Manual verification rate | How often staff need to confirm data before responding. | Track VERIFY outcomes and completed checks. |
+| Time to answer | Effort needed to respond to a customer request. | Compare representative staff tasks before and during the pilot. |
+| Staff adoption | Whether the workflow is practical in stores. | Measure eligible requests evaluated and active use by pilot staff. |
+| Model calibration, if ML is used | Whether reported probability bands match observed frequencies. | Evaluate held-out real outcomes and analyze errors by product, source, and route. |
 
-**Scoring criteria comparison:**
+Targets of at least 92% inventory accuracy, at least 60% weekly use by counter staff, and a five-percentage-point improvement in on-time promise accuracy appeared in the initial concept. They are **proposed pilot targets**, not observed results or approved service levels. The pilot team should confirm definitions, baselines, sample sizes, and thresholds with Company A before using them as rollout gates.
 
-| Criteria | Slide compliance |
+## Dependencies and limitations
+
+| Area | Implication |
 |---|---|
-| Problem Understanding | 2 |
-| Prioritisation & Critical Thinking | 3, 6, 10 |
-| Business Impact | 8 |
-| Feasible solution | 4, 7, 9 |
-| Structured thinking & Innovation | 5, 6, and the overall narrative |
+| Source data quality | Missing, stale, or inconsistent records may force verification or rejection; reliable source timestamps are essential. |
+| System access and ownership | Country teams must provide access, field definitions, and named owners for product, inventory, and route data. |
+| Commitment process | A recommendation does not reserve units; operational integration is needed before a production commitment can be secured. |
+| Model readiness | Synthetic results do not prove performance on real orders; rules remain the fallback until models are validated and monitored. |
+| Local variation | Catalog identifiers, routes, working calendars, language, and store procedures may vary by country. |
+| Pilot adoption | Staff need understandable reasons and a practical way to check doubtful stock. |
+
+The current PoC supports one source per request, store pickup, weekday-based routing, and a fixed sample time in the web form. It does not support split fulfillment, public holidays, customer delivery, order writes, live data, automatic feedback capture, or calibrated production probabilities. Pilot requirements should determine which of these limits to address first.
+
+## Related documentation
+
+- [Technical design and implementation specification](technical-specification.md) describes the broader Promise Engine concept.
+- [Data, features, and models](../data-features-models.md) defines implemented PoC behavior and limitations.
+- [Synthetic data generation](../synthetic-data-generation.md) explains the local sample records.
+- [README](../../README.md) provides installation, run commands, and the interface overview.

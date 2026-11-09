@@ -1,9 +1,16 @@
-# Promise Engine – Technical Design & Implementation Specification
+# Promise Engine — Technical Specification
 
-**Version:** 1.0<br>
-**Scope:** MVP 12 weeks<br>
-**Approach Model:** Hybrid Rules + Machine Learning + Optimization<br>
-**Deployment Architecture:** Read-only integration with ERP / POS / WMS during MVP phase
+**Version:** 1.0
+
+**Status:** Proposed production design; the repository implements a narrower local proof of concept (PoC).
+
+**Scope:** Inventory confidence, available-to-promise calculation, fulfillment and delivery assessment, decision processing, data model, and proposed service interfaces.
+
+**Approach:** Rules baseline with optional machine learning and later fulfillment optimization.
+
+**Integration assumption:** Read-only access to ERP, POS, and WMS data during an initial pilot.
+
+The API, event processing, operational storage, feedback capture, and deployment architecture in this document describe a proposed system. They are not implemented by the local PoC. The implemented behavior and its synthetic-data limitations are documented in [Data, features, and models](../data-features-models.md).
 
 ---
 
@@ -44,9 +51,9 @@ It therefore evaluates three separate probability groups:
 
 The final result estimates the probability of keeping the whole promise.
 
-### 1.3. MVP Scope
+### 1.3. Proposed pilot scope
 
-MVP focuses on:
+The proposed pilot focuses on:
 
 - A pilot country.
 - Approximately 15 stores and 1 Distribution Center.
@@ -56,13 +63,13 @@ MVP focuses on:
 - Predict delivery dates using historical delivery records.
 - Record actual results to serve model training.
 
-The MVP does not write inventory updates back to source systems.
+The proposed pilot does not write inventory updates back to source systems.
 
 ---
 
-# 2. Overall Architecture
+## 2. Overall Architecture
 
-## 2.1. Logical Architecture
+### 2.1. Logical Architecture
 
 ```mermaid
 flowchart TB
@@ -123,7 +130,7 @@ flowchart TB
     ML --> DP
 ```
 
-## 2.2. Key Components
+### 2.2. Key Components
 
 | Component | Responsibility |
 |---|---|
@@ -139,11 +146,11 @@ flowchart TB
 
 ---
 
-# 3. Training data design
+## 3. Training data design
 
 This is the most important foundation for the Promise Engine. A model can predict reliably only if the data records both what was known at decision time and what actually happened afterward.
 
-## 3.1. Data sources
+### 3.1. Data sources
 
 | Source | Data to retrieve | Purpose |
 |---|---|---|
@@ -156,9 +163,9 @@ This is the most important foundation for the Promise Engine. A model can predic
 
 If the MVP is not connected to TMS, you can use the existing delivery history from ERP or WMS, but you need to evaluate the quality and completeness of this data.
 
-## 3.2. Training data groups
+### 3.2. Training data groups
 
-### A. Product and Location
+#### A. Product and Location
 
 Product characteristics and warehouse location description.
 
@@ -176,7 +183,7 @@ Product characteristics and warehouse location description.
 
 These attributes may affect inventory discrepancies, order processing speed, and delivery time.
 
-### B. Inventory Snapshot
+#### B. Inventory Snapshot
 
 Save inventory status at each point in time.
 
@@ -196,7 +203,7 @@ Save inventory status at each point in time.
 
 **Note:** `source_updated_at` and `received_at` must be stored separately to determine synchronization lag.
 
-### C. Inventory Events
+#### C. Inventory Events
 
 Log events that change inventory.
 
@@ -214,7 +221,7 @@ Log events that change inventory.
 
 The data pipeline must handle duplicate, late, and out-of-order events.
 
-### D. Inventory Count and Discrepancy
+#### D. Inventory Count and Discrepancy
 
 This is the important data for training the Inventory Confidence Model.
 
@@ -252,7 +259,7 @@ Example:
 
 Do not assume every count is perfectly accurate; the counting process can also make mistakes. Record its source, time, and verification method.
 
-### E. Delivery and Fulfillment History
+#### E. Delivery and Fulfillment History
 
 Data used for training the Delivery Prediction Model.
 
@@ -287,7 +294,7 @@ If data exists, add:
 
 It is not necessary to have all fields in the MVP.
 
-### F. Promise Decision Log
+#### F. Promise Decision Log
 
 All decisions must be recorded for model evaluation.
 
@@ -313,11 +320,11 @@ All decisions must be recorded for model evaluation.
 
 ---
 
-# 4. Build training labels (Training Labels)
+## 4. Build training labels (Training Labels)
 
 Need to build a separate label for each problem, rather than training a unified model from the start.
 
-## 4.1. Inventory Confidence Model
+### 4.1. Inventory Confidence Model
 
 **Objective:** Predict the system inventory data within an acceptable error margin compared to actual inventory.
 
@@ -347,7 +354,7 @@ $$
 
 This is the probability of inventory data accuracy, not the order fulfillment probability.
 
-## 4.2. Fulfillment Probability Model
+### 4.2. Fulfillment Probability Model
 
 **Objective:** Forecast the ability to meet the required quantity at a supply source.
 
@@ -371,7 +378,7 @@ Example:
 
 Do not use canceled orders due to customer changes as label failures if the reason is not related to inventory.
 
-## 4.3. Delivery Prediction Model
+### 4.3. Delivery Prediction Model
 
 **Objective:** Forecast the ability to deliver on the promised time.
 
@@ -395,7 +402,7 @@ Special cases to handle:
 
 Do not combine all the above cases into label 0. Need to classify the root causes to avoid model bias.
 
-## 4.4. Promise Success Model
+### 4.4. Promise Success Model
 
 In the initial phase, the overall success probability can be calculated from the components.
 
@@ -421,9 +428,9 @@ The MVP phase should use this calculation with clearly stated assumptions. When 
 
 ---
 
-# 5. Feature Engineering Design
+## 5. Feature Engineering Design
 
-## 5.1. Inventory Confidence features
+### 5.1. Inventory Confidence features
 
 | Feature | Description | Source |
 |---|---|---|
@@ -441,7 +448,7 @@ The MVP phase should use this calculation with clearly stated assumptions. When 
 
 Time-based features must be calculated using data available at `request_time`, to avoid data leakage.
 
-## 5.2. Fulfillment features
+### 5.2. Fulfillment features
 
 | Feature | Description |
 |---|---|
@@ -455,7 +462,7 @@ Time-based features must be calculated using data available at `request_time`, t
 | warehouse_capacity | Remaining Processing Capacity |
 | picking_workload | Current Picking Volume |
 
-## 5.3. Delivery Prediction features
+### 5.3. Delivery Prediction features
 
 | Feature | Description |
 |---|---|
@@ -477,9 +484,9 @@ Remove all features that appear after the delivery event has occurred, for examp
 
 ---
 
-# 6. Modeling Strategy
+## 6. Modeling Strategy
 
-## 6.1. Overall Strategy
+### 6.1. Overall Strategy
 
 Do not include all problems in a single model.
 
@@ -493,11 +500,11 @@ Propose three independent models:
 
 Promise Decision Layer synthesizes results from models and business rules.
 
-## 6.2. Phase 1 – Rule-based Baseline
+### 6.2. Phase 1 – Rule-based Baseline
 
 The goal is to build a system that operates even when sufficient training data is not available.
 
-### Inventory Confidence Rules
+#### Inventory Confidence Rules
 
 Initialize confidence = 100, then subtract points based on risks.
 
@@ -526,7 +533,7 @@ Initial grouping:
 
 The penalties and thresholds are initial values for pilot, not verified thresholds. Need to be adjusted with actual data.
 
-### ATP Calculation
+#### ATP Calculation
 
 $$
 ATP = OnHand - Reserved - Allocated - SafetyBuffer
@@ -548,7 +555,7 @@ Do not include inbound stock in default ATP. Only calculate inbound when:
 - Goods arrive before the required fulfillment time.
 - Can receive and process goods in accordance with the procedure.
 
-### Delivery Rules
+#### Delivery Rules
 
 $$
 EstimatedDelivery =
@@ -564,9 +571,9 @@ Need to consider further:
 - Carrier cutoff time.
 - Current processing capacity.
 
-## 6.3. Stage 2 – Machine Learning
+### 6.3. Stage 2 – Machine Learning
 
-### A. Inventory Confidence Model
+#### A. Inventory Confidence Model
 
 **Initial model:** Logistic Regression or Gradient Boosting.
 
@@ -593,7 +600,7 @@ Example:
 }
 ```
 
-### B. Fulfillment Model
+#### B. Fulfillment Model
 
 The goal is to forecast the ability to meet the required quantity.
 
@@ -605,7 +612,7 @@ Proposed model:
 
 If the Inventory Confidence model forecasts the accurate probability of stock levels, it should not be directly used as the probability of fulfilling an order. It needs to be combined with the order quantity, available inventory, stock deviation, and allocation rules.
 
-### C. Delivery Prediction Model
+#### C. Delivery Prediction Model
 
 **Proposed model:** Gradient Boosting Classifier.
 
@@ -626,7 +633,7 @@ Output:
 
 The model should forecast the probability of on-time delivery per delivery date scenario, rather than forecasting a single average shipping time.
 
-### D. Probability Calibration
+#### D. Probability Calibration
 
 This is a mandatory step before using probability to commit.
 
@@ -646,7 +653,7 @@ Example:
 
 If the model predicts 100 cases with a 90% success probability, approximately 90 cases need to succeed. If only 70 cases succeed, the model is overly confident.
 
-## 6.4. Split the training data
+### 6.4. Split the training data
 
 Do not randomly split the data because the data has temporal factors.
 
@@ -668,7 +675,7 @@ Ensure that future records do not leak into past records' features.
 
 Also evaluate generalization capability across stores, warehouses, and product categories.
 
-## 6.5. Conditions for transitioning from Rules to ML
+### 6.5. Conditions for transitioning from Rules to ML
 
 Only enable ML in production when:
 
@@ -683,9 +690,9 @@ If conditions are not met, continue using Rules.
 
 ---
 
-# 7. Promise Request Processing Procedure
+## 7. Promise Request Processing Procedure
 
-## 7.1. Step 1 – Receive Request
+### 7.1. Step 1 – Receive Request
 
 Input:
 
@@ -698,7 +705,7 @@ Input:
 
 Check and standardize input data and product/location identifiers.
 
-## 7.2. Step 2 – Check data quality
+### 7.2. Step 2 – Check data quality
 
 Check:
 
@@ -711,7 +718,7 @@ Check:
 
 If the data does not meet the requirements, do not automatically provide a high-confidence guarantee.
 
-## 7.3. Step 3 – Inventory Assessment
+### 7.3. Step 3 – Inventory Assessment
 
 Calculate:
 
@@ -748,7 +755,7 @@ def assess_inventory(stock, reserved, allocated, features):
 
 In production, additional validation, rounding quantities, handling missing data, and business threshold controls need to be added.
 
-## 7.4. Step 4 – Assess fulfillment
+### 7.4. Step 4 – Assess fulfillment
 
 Identify potential supply sources:
 
@@ -764,7 +771,7 @@ Remove suppliers that do not meet criteria:
 - Does not meet cutoff.
 - Does not support corresponding delivery type.
 
-## 7.5. Step 5 – Delivery Prediction
+### 7.5. Step 5 – Delivery Prediction
 
 For each valid supplier:
 
@@ -775,7 +782,7 @@ For each valid supplier:
 5. Calculate on-time delivery probability.
 6. Evaluate feasible delivery dates.
 
-## 7.6. Step 6 – Risk Assessment
+### 7.6. Step 6 – Risk Assessment
 
 Aggregate factors:
 
@@ -794,7 +801,7 @@ $$
 
 The formula above is only an approximation under the assumption of independence. When sufficient data is available, the joint probability model should be evaluated to handle correlations between factors.
 
-## 7.7. Step 7 – Promise Decision
+### 7.7. Step 7 – Promise Decision
 
 Initial proposed threshold:
 
@@ -808,7 +815,7 @@ These thresholds must be adjusted with Product and Operations based on carry cos
 
 Should not only maximize success probability. The system needs to balance reliability and promise coverage (the percentage of requests that can be fulfilled).
 
-## 7.8. Step 8 – Fulfillment Optimization
+### 7.8. Step 8 – Fulfillment Optimization
 
 When multiple feasible supply options are available, select the optimal option.
 
@@ -839,7 +846,7 @@ Tools that can be used:
 
 **MVP Limitation:** Prioritize one supply source. If insufficient, try another DC source or up to two supply sources. Optimize full multi-source for Phase 2.
 
-## 7.9. Step 9 – Record decision and feedback
+### 7.9. Step 9 – Record decision and feedback
 
 Each evaluation must be saved:
 
@@ -857,9 +864,9 @@ Feedback used to update training labels and model effectiveness evaluation.
 
 ---
 
-# 8. Design API
+## 8. Design API
 
-## 8.1. API Overview
+### 8.1. API Overview
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -873,7 +880,7 @@ Feedback used to update training labels and model effectiveness evaluation.
 
 In the MVP, the following three APIs can be deployed first: evaluate, confirm, and feedback. The remaining APIs can be added as needed.
 
-## 8.2. POST /v1/promises/evaluate
+### 8.2. POST /v1/promises/evaluate
 
 **Purpose:** Evaluate the capability to meet a requirement and return a commitment plan.
 
@@ -937,7 +944,7 @@ Response:
 
 Note: `promise_success_probability` in this example is calculated as `0.97 × 0.98 = 0.9506`, assuming independence.
 
-### Decision values
+#### Decision values
 
 | Value | Meaning |
 |---|---|
@@ -945,7 +952,7 @@ Note: `promise_success_probability` in this example is calculated as `0.97 × 0.
 | VERIFY | Requires additional checks |
 | REJECT | Not committable |
 
-### Risk Band values
+#### Risk Band values
 
 | Value | Meaning |
 |---|---|
@@ -955,7 +962,7 @@ Note: `promise_success_probability` in this example is calculated as `0.97 × 0.
 
 The name `risk_band` should be consistently understood: HIGH here refers to high confidence, not high risk. To avoid confusion, it should be changed to `confidence_band`.
 
-## 8.3. GET /v1/promises/{promise_id}
+### 8.3. GET /v1/promises/{promise_id}
 
 Retrieve saved evaluation results.
 
@@ -974,7 +981,7 @@ Response:
 
 This API should return historical results at the time of evaluate, not recompute using a new model.
 
-## 8.4. POST /v1/promises/{promise_id}/confirm
+### 8.4. POST /v1/promises/{promise_id}/confirm
 
 **Purpose:** Confirm that the sales system or user has adopted the commitment plan.
 
@@ -1000,7 +1007,7 @@ Response:
 
 This is a business decision recording step, not an inventory reservation command in ERP/WMS.
 
-## 8.5. POST /v1/promises/{promise_id}/feedback
+### 8.5. POST /v1/promises/{promise_id}/feedback
 
 **Purpose:** Record actual results to evaluate accuracy and train the model.
 
@@ -1043,7 +1050,7 @@ Response:
 
 Label `inventory_accurate` should be calculated based on the configured tolerance. Do not consider any unit deviation as accurate by default.
 
-## 8.6. GET /v1/availability
+### 8.6. GET /v1/availability
 
 **Purpose:** Provide availability information for frontend or POS systems.
 
@@ -1069,7 +1076,7 @@ Response:
 
 API availability only indicates the presence of stock. If the delivery date and the ability to fulfill the promise are required, the frontend must use Promise Evaluate.
 
-## 8.7. API Error Handling
+### 8.7. API Error Handling
 
 Standardize errors:
 
@@ -1102,7 +1109,7 @@ Example:
 }
 ```
 
-## 8.8. API Non-functional Requirements
+### 8.8. API Non-functional Requirements
 
 | Requirement | MVP Goal |
 |---|---|
@@ -1120,9 +1127,9 @@ Performance thresholds must be validated through real load testing and depend on
 
 ---
 
-# 9. Data Model and Storage
+## 9. Data Model and Storage
 
-## 9.1. Core Tables
+### 9.1. Core Tables
 
 ```mermaid
 erDiagram
@@ -1194,7 +1201,7 @@ erDiagram
     }
 ```
 
-## 9.2. Storage Technology References
+### 9.2. Storage Technology References
 
 | Component | Technology |
 |---|---|
@@ -1209,9 +1216,9 @@ Not all components need to be implemented in MVP. PostgreSQL, object storage, an
 
 ---
 
-# 10. Evaluate and monitor the model
+## 10. Evaluate and monitor the model
 
-## 10.1. Model Evaluation Metrics
+### 10.1. Model Evaluation Metrics
 
 | Model | Metric | Evaluation goals |
 |---|---|---|
@@ -1225,7 +1232,7 @@ Not all components need to be implemented in MVP. PostgreSQL, object storage, an
 
 Do not evaluate the model only by Accuracy. In the context of Promise Engine, the probability calibration and the level of control over false promises are more important.
 
-## 10.2. Business KPIs
+### 10.2. Business KPIs
 
 | KPI | Formula / Meaning |
 |---|---|
@@ -1248,7 +1255,7 @@ Report KPIs by:
 - Requested quantity.
 - Model version.
 
-## 10.3. Monitoring and Alerting
+### 10.3. Monitoring and Alerting
 
 Monitoring issues:
 
@@ -1265,35 +1272,7 @@ When model drift or abnormal input data is detected, the system must be able to 
 
 ---
 
-# 11. MVP Deployment Plan (12 weeks)
-
-| Stage | Week | Work | Deliverables |
-|---|---:|---|---|
-| Data Foundation | 1–2 | ERP/POS/WMS integration, canonical schema, snapshot and event | Unified Inventory |
-| Inventory Intelligence | 3–4 | Inventory rules, discrepancy, confidence, ATP | Inventory Assessment |
-| Rules-based Promise | 5–6 | Promise API, delivery rules, decision logic | Promise Engine v1 |
-| ML Enhancement | 7–8 | Label preparation, baseline training, calibration | ML models v1 |
-| Pilot | 9–10 | Frontend integration, feedback, trial operation | Pilot Release |
-| Evaluation | 11–12 | KPI measurement, model evaluation, optimization and rollback test | MVP Evaluation Report |
-
-## 11.1. MVP Completion Conditions
-
-- Product and location data standardization.
-- Inventory snapshot/event reception and processing.
-- Inventory Confidence Rules.
-- ATP calculation.
-- Has Delivery Prediction baseline.
-- Has Promise Evaluate API.
-- Stores Promise Decision Log.
-- Records feedback and actual outcome.
-- Has KPI dashboard.
-- Can fallback from ML to Rules.
-
-ML is not a mandatory condition for MVP completion. If training data is insufficient, prioritize operational stability using rules.
-
----
-
-# 12. Technical decisions need to be consistent
+## 11. Open technical decisions
 
 Before starting implementation, need to finalize the following issues:
 
@@ -1312,22 +1291,18 @@ Before starting implementation, need to finalize the following issues:
 
 ---
 
-# 13. Deployment recommendations
+## 12. Implementation priorities
 
-## Priority 1 – Reliable Promise
+### Priority 1 – Reliable Promise
 
 Focus on clean data, synchronized inventory, reliability control, and ATP rules. This is the mandatory foundation.
 
-## Priority 2 – Predictive Promise
+### Priority 2 – Predictive Promise
 
 Deploy the Inventory Confidence Model and Delivery Prediction Model after sufficient inventory counts and delivery history are available.
 
-## Priority 3 – Optimized Promise
+### Priority 3 – Optimized Promise
 
 Optimize multiple supply sources, fulfillment costs, and operational capacity once the system is stable.
 
-**Important Recommendation:** Do not start by building a complex ML model to predict the final promise. Instead, build three meaningful business-level probability layers, evaluate each layer independently, and then combine them into a Promise Decision.
-
-> Traditional inventory systems tell us what the system thinks we have. Promise Engine tells us what we can confidently commit to our customers.
-
-**Know → Predict → Commit.**
+Build and evaluate the inventory, fulfillment, and on-time layers separately before combining them into a promise decision. A single model for the final decision would make the contributing risks harder to inspect and validate.

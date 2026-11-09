@@ -1,6 +1,6 @@
 # Promise Engine PoC data, features, and trained models
 
-This document describes the **working core** of the PoC: its inputs, how they become features and labels, the three trained models, and how their outputs are used to evaluate a request. The authoritative sources for this PoC are the category files in [`data/`](../data/), [`features.py`](../src/promise_poc/features.py), [`ml.py`](../src/promise_poc/ml.py), [`rules.py`](../src/promise_poc/rules.py), and [`engine.py`](../src/promise_poc/engine.py). Broader ideas are described in [`docs/resources/methodology.md`](resources/methodology.md); fields and techniques mentioned only there **are not necessarily implemented** here.
+This document describes the **working core** of the PoC: its inputs, how they become features and labels, the three trained models, and how their outputs are used to evaluate a request. The authoritative sources for this PoC are the category files in [`data/`](../data/), [`features.py`](../src/promise_poc/features.py), [`ml.py`](../src/promise_poc/ml.py), [`rules.py`](../src/promise_poc/rules.py), and [`engine.py`](../src/promise_poc/engine.py). Broader ideas are described in [`docs/resources/technical-specification.md`](resources/technical-specification.md); fields and techniques mentioned only there **are not necessarily implemented** here.
 
 ## 1. Three questions the models address
 
